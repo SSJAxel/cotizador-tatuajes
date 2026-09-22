@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: cotizador-tatuajes-postgres
+    environment:
+      POSTGRES_USER: cotizador
+      POSTGRES_PASSWORD: cotizador
+      POSTGRES_DB: cotizador
+    ports:
+      - "5433:5432"
+    volumes:
+      - cotizador_pgdata:/var/lib/postgresql/data
+
+volumes:
+  cotizador_pgdata:

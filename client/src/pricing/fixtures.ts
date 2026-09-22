@@ -1,0 +1,20 @@
+/** Traducciones de los valores internos (slug) a texto legible en el formulario. */
+export const ETIQUETAS: Record<string, string> = {
+  brazo: "Brazo",
+  espalda: "Espalda",
+  pierna: "Pierna",
+  pecho: "Pecho",
+  cuello: "Cuello",
+  lineas_finas: "Líneas finas",
+  blackwork: "Blackwork",
+  realismo: "Realismo",
+  acuarela: "Acuarela",
+  cualquiera_del_estudio: "Cualquiera del estudio",
+  pocos_en_la_zona: "Pocos en la zona lo hacen",
+  soy_el_unico: "Soy el único que lo hace",
+  estandar: "Estándar",
+  premium: "Premium",
+  horario_habitual: "Horario habitual",
+  fuera_de_horario: "Fuera de horario",
+  urgente_mismo_dia: "Urgente / mismo día",
+};

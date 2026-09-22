@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Un tenant = un tatuador/estudio. Las zonas íntimas excluidas
+// (pene, ano, paladar, esclerótica) NO viven acá — son una constante
+// hardcodeada en la app (ver src/pricing/types.ts), no configurable.
+model Tenant {
+  id                String   @id @default(cuid())
+  slug              String   @unique
+  nombre            String
+  moneda            String   @default("ARS")
+  agujasIncluidas   Int      @default(1)
+  agujasPrecioExtra Float    @default(0)
+  passwordHash      String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  zonas             ZonaPrecio[]
+  tecnicas          Tecnica[]
+  especializaciones NivelEspecializacion[]
+  calidadesProducto CalidadProducto[]
+  horarios          Horario[]
+}
+
+model ZonaPrecio {
+  id          String @id @default(cuid())
+  tenantId    String
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  zona        String
+  precioPorCm Float
+
+  @@unique([tenantId, zona])
+}
+
+model Tecnica {
+  id                String @id @default(cuid())
+  tenantId          String
+  tenant            Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nombre            String
+  multiplicador     Float
+  costoInsumoTintas Float
+
+  @@unique([tenantId, nombre])
+}
+
+model NivelEspecializacion {
+  id            String @id @default(cuid())
+  tenantId      String
+  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nivel         String
+  multiplicador Float
+
+  @@unique([tenantId, nivel])
+}
+
+model CalidadProducto {
+  id        String @id @default(cuid())
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nivel     String
+  costoFijo Float
+
+  @@unique([tenantId, nivel])
+}
+
+model Horario {
+  id                String @id @default(cuid())
+  tenantId          String
+  tenant            Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  franja            String
+  recargoPorcentual Float
+
+  @@unique([tenantId, franja])
+}

@@ -318,6 +318,36 @@ muestra las 28 etiquetas legibles (no slugs crudos), cotizar con "Esternón"
 plantilla estándar" en un tenant nuevo completa las 28 filas de zona (más
 el resto de categorías) de un click, guardable sin errores.
 
+### Técnicas/estilos: de 4 genéricas a 18 (2026-09-25)
+
+Mismo criterio que con las zonas, aplicado a técnicas. Investigación de
+comparativas de tiempo por estilo de tatuaje:
+
+- **El color agrega tiempo real**: el realismo a color es "el estilo más
+  demandante en tiempo para la mayoría de los artistas" — más que el
+  realismo en blanco y negro, por la interacción entre colores adyacentes,
+  el layering para saturación pareja y las transiciones suaves entre
+  pigmentos.
+- **Dotwork/puntillismo es de lo más lento que existe** — colocar miles de
+  puntos individuales a mano, "requiere paciencia y precisión inmensas".
+- **Aguja única (single needle) es notoriamente lento**: un ejemplo citado
+  en la investigación — un área sólida negra del tamaño de una palma puede
+  llevar 4 horas con aguja única, mucho más que con sombreado a máquina
+  convencional (magnum).
+- **Blackwork y tradicional son relativamente rápidos** pese a verse
+  "pesados" — agujas de grupo grande (magnum) cubren área sólida rápido,
+  son de los estilos más veloces por cm² pese al look denso.
+
+**18 técnicas** reemplazan las 4 genéricas (líneas finas/blackwork/
+realismo/acuarela), de 0.85 (lettering, el más simple/rápido) a 1.85
+(realismo a color, el más demandante). `lineas_finas` (1.0), `blackwork`
+(1.15), `acuarela` (1.4) y `realismo` (1.6) se mantuvieron en sus valores
+originales a propósito — son el ancla histórica de `calculate.test.ts`, que
+no se tocó y sigue en verde.
+
+Verificado en navegador real: el select de técnica del cliente muestra las
+18 etiquetas, cotizar con "Realismo a color" da el precio esperado a mano.
+
 ## Vista 3D (v2 — investigada, no iniciada)
 
 Modelo humano 3D con peso y altura ajustables, sobre el que se superpone el

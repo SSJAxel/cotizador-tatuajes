@@ -33,11 +33,28 @@ export const ETIQUETAS: Record<string, string> = {
   rodilla: "Rodilla",
   esternon: "Esternón",
 
-  // Técnicas, especialización, calidad, horarios
+  // Técnicas/estilos de tatuaje — ver "Rediseño del motor de precio" en el
+  // README para la investigación detrás de cada multiplicador de horas.
   lineas_finas: "Líneas finas",
+  lettering: "Lettering / caligrafía",
+  tribal: "Tribal",
+  tradicional_americano: "Tradicional americano",
   blackwork: "Blackwork",
-  realismo: "Realismo",
+  new_school: "New school",
+  stick_and_poke: "Stick and poke",
+  chicano: "Chicano",
+  blackout: "Blackout",
+  neotradicional: "Neotradicional",
+  trash_polka: "Trash polka",
   acuarela: "Acuarela",
+  geometrico: "Geométrico / mandala",
+  japones: "Japonés (irezumi)",
+  realismo: "Realismo (blanco y negro)",
+  aguja_unica: "Aguja única (single needle)",
+  puntillismo: "Puntillismo (dotwork)",
+  realismo_color: "Realismo a color",
+
+  // Especialización, calidad, horarios
   cualquiera_del_estudio: "Cualquiera del estudio",
   pocos_en_la_zona: "Pocos en la zona lo hacen",
   soy_el_unico: "Soy el único que lo hace",
@@ -92,11 +109,28 @@ export const PLANTILLA_ESTANDAR: TenantPricingConfig = {
     { zona: "rodilla", multiplicador: 1.5 },
     { zona: "esternon", multiplicador: 1.55 },
   ],
+  // 18 técnicas (2026-09-25) en vez de 4 genéricas. "lineas_finas",
+  // "blackwork", "acuarela" y "realismo" se mantienen en sus valores
+  // originales a propósito: son el ancla histórica de calculate.test.ts.
   tecnicas: [
     { nombre: "lineas_finas", multiplicadorHoras: 1.0 },
+    { nombre: "lettering", multiplicadorHoras: 0.85 },
+    { nombre: "tribal", multiplicadorHoras: 0.95 },
+    { nombre: "tradicional_americano", multiplicadorHoras: 1.1 },
     { nombre: "blackwork", multiplicadorHoras: 1.15 },
-    { nombre: "realismo", multiplicadorHoras: 1.6 },
+    { nombre: "new_school", multiplicadorHoras: 1.2 },
+    { nombre: "stick_and_poke", multiplicadorHoras: 1.3 },
+    { nombre: "chicano", multiplicadorHoras: 1.3 },
+    { nombre: "blackout", multiplicadorHoras: 1.3 },
+    { nombre: "neotradicional", multiplicadorHoras: 1.35 },
+    { nombre: "trash_polka", multiplicadorHoras: 1.35 },
     { nombre: "acuarela", multiplicadorHoras: 1.4 },
+    { nombre: "geometrico", multiplicadorHoras: 1.45 },
+    { nombre: "japones", multiplicadorHoras: 1.5 },
+    { nombre: "realismo", multiplicadorHoras: 1.6 },
+    { nombre: "aguja_unica", multiplicadorHoras: 1.7 },
+    { nombre: "puntillismo", multiplicadorHoras: 1.75 },
+    { nombre: "realismo_color", multiplicadorHoras: 1.85 },
   ],
   especializacion: [
     { nivel: "cualquiera_del_estudio", multiplicadorTarifa: 1.0 },

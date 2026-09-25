@@ -14,6 +14,12 @@ import { useHumanoidModel } from "./useHumanoidModel";
 import type { HumanoidModel } from "./useHumanoidModel";
 import { NOMBRE_ZONA, clasificarZona } from "./types";
 import type { ZonaCuerpo } from "./types";
+import {
+  borrarDiseno,
+  cargarDiseno,
+  comprimirImagenADataUrl,
+  guardarDiseno,
+} from "./persistencia";
 import "./preview3d.css";
 
 function useTexturaSubida(url: string | null) {
@@ -148,7 +154,11 @@ function Scena({
   );
 }
 
-export function Preview3D() {
+type Preview3DProps = {
+  tenantSlug?: string;
+};
+
+export function Preview3D({ tenantSlug = "default" }: Preview3DProps) {
   const modelo = useHumanoidModel();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [activaZona, setActivaZona] = useState<ZonaCuerpo | null>(null);
@@ -157,8 +167,45 @@ export function Preview3D() {
   ]);
   const [decalRollDeg, setDecalRollDeg] = useState(0);
   const [decalScale, setDecalScale] = useState(0.35);
+  const [cargadoDeGuardado, setCargadoDeGuardado] = useState(false);
+  const inputArchivoRef = useRef<HTMLInputElement | null>(null);
 
   const textura = useTexturaSubida(imageUrl);
+
+  // Restaurar diseño guardado en este navegador, una sola vez al montar.
+  useEffect(() => {
+    const guardado = cargarDiseno(tenantSlug);
+    if (guardado) {
+      setImageUrl(guardado.imagenDataUrl);
+      setActivaZona(guardado.zona);
+      setDecalPos(guardado.localPos);
+      setDecalRollDeg(guardado.rotacionDeg);
+      setDecalScale(guardado.escala);
+    }
+    setCargadoDeGuardado(true);
+  }, [tenantSlug]);
+
+  // Guardar cambios posteriores (no en la primera carga, para no
+  // reescribir con los mismos datos que acabamos de leer).
+  useEffect(() => {
+    if (!cargadoDeGuardado) return;
+    if (!imageUrl || !activaZona) return;
+    guardarDiseno(tenantSlug, {
+      imagenDataUrl: imageUrl,
+      zona: activaZona,
+      localPos: decalPos,
+      rotacionDeg: decalRollDeg,
+      escala: decalScale,
+    });
+  }, [
+    cargadoDeGuardado,
+    tenantSlug,
+    imageUrl,
+    activaZona,
+    decalPos,
+    decalRollDeg,
+    decalScale,
+  ]);
 
   const handlePlace = useCallback(
     (zona: ZonaCuerpo, localPos: THREE.Vector3) => {
@@ -168,14 +215,18 @@ export function Preview3D() {
     [],
   );
 
-  function handleArchivo(event: ChangeEvent<HTMLInputElement>) {
+  async function handleArchivo(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setImageUrl((anterior) => {
-      if (anterior) URL.revokeObjectURL(anterior);
-      return url;
-    });
+    const dataUrl = await comprimirImagenADataUrl(file);
+    setImageUrl(dataUrl);
+  }
+
+  function handleQuitarDiseno(inputArchivo: HTMLInputElement | null) {
+    setImageUrl(null);
+    setActivaZona(null);
+    borrarDiseno(tenantSlug);
+    if (inputArchivo) inputArchivo.value = "";
   }
 
   return (
@@ -190,12 +241,29 @@ export function Preview3D() {
 
         <label className="preview3d__campo">
           Diseño
-          <input type="file" accept="image/*" onChange={handleArchivo} />
+          <input
+            ref={inputArchivoRef}
+            type="file"
+            accept="image/*"
+            onChange={handleArchivo}
+          />
         </label>
 
         {!modelo && <p className="preview3d__aviso">Cargando modelo 3D…</p>}
         {modelo && !textura && (
           <p className="preview3d__aviso">Subí una imagen para poder ubicarla.</p>
+        )}
+        {textura && (
+          <div className="preview3d__diseno-guardado">
+            <p className="preview3d__aviso">Guardado en este navegador.</p>
+            <button
+              type="button"
+              className="preview3d__quitar"
+              onClick={() => handleQuitarDiseno(inputArchivoRef.current)}
+            >
+              Quitar diseño
+            </button>
+          </div>
         )}
 
         {activaZona && textura && (

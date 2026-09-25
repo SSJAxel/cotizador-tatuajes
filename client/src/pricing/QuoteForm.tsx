@@ -273,7 +273,7 @@ export function QuoteForm() {
         </button>
       </section>
 
-      {mostrarVista3D && <Preview3D />}
+      {mostrarVista3D && <Preview3D tenantSlug={TENANT_SLUG} />}
     </div>
   );
 }

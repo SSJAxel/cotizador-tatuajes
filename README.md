@@ -220,8 +220,39 @@ real (~14.400 caras, piel + ojos como materiales separados).
   sobre la curvatura real de la malla — mejor wrap que con las cápsulas del
   mock v1. Sin errores de consola propios.
 - Sigue pendiente: sin peso/altura ajustable (deliberado, próxima fase si
-  el mock engancha), sin reposar el modelo a una postura natural, sin
-  conexión al flujo real de `QuoteForm.tsx`.
+  el mock engancha), sin reposar el modelo a una postura natural.
+
+### Conectado al flujo real del cotizador (2026-09-24)
+
+Dejó de ser una pestaña "Vista 3D (beta)" aparte en `App.tsx` — ahora vive
+dentro de `QuoteForm.tsx` (la página del cliente), debajo del
+formulario/resultado de precio, detrás de un toggle "Mostrar vista previa
+3D" que la monta recién al abrirla (evita cargar Three.js + el modelo de
+1.3MB en cada visita de quien solo quiere el precio). Es puramente una
+ayuda visual — no afecta ni se conecta al cálculo.
+
+### Diseño persistido en el navegador (2026-09-24)
+
+El diseño subido (imagen + zona + posición + rotación + tamaño) se guarda en
+`localStorage`, namespaced por tenant (`cotizador3d:<slug>`) —
+`client/src/preview3d/persistencia.ts`. Alcance elegido a propósito por el
+usuario: **solo local al navegador**, no viaja al servidor ni es
+compartible entre dispositivos (no hay todavía concepto de "pedido"/turno
+guardado en este proyecto — es puramente un cotizador, no un sistema de
+reservas).
+
+- La imagen se comprime a máx. 900px de lado y se guarda como PNG en base64
+  (`comprimirImagenADataUrl`) — PNG y no JPEG para no perder transparencia
+  en diseños tipo stencil/línea con fondo transparente, a costa de un
+  payload más grande que JPEG (aceptable para una sola imagen dentro del
+  límite de `localStorage`, ~5-10MB por origen).
+- Botón "Quitar diseño" junto al aviso "Guardado en este navegador" —
+  limpia el estado y el `localStorage`, y resetea el `<input type="file">`
+  (que si no, sigue mostrando el nombre del archivo viejo aunque el estado
+  ya esté vacío).
+- Verificado en navegador real con Playwright: subir diseño → ubicarlo →
+  mover sliders → reload de la página → todo se restaura igual (zona,
+  posición, rotación, tamaño) → "Quitar diseño" → reload → no queda nada.
 
 ## Investigación de competencia
 
@@ -390,9 +421,12 @@ navegador real (Playwright):
    (2026-09-24): ya no es una pestaña aparte, vive dentro de la página del
    cotizador cliente detrás de un toggle "Mostrar vista previa 3D" (se monta
    recién al abrirlo, para no cargar Three.js/el modelo en cada visita).
-   Pendiente real que queda: el diseño subido sigue sin persistir — si el
-   cliente cierra o recarga la página, se pierde; no viaja al pedido/turno.
-4. Validar el v1 (motor de precio + vista 3D embebida) con LusiTattoo en
+4. ~~Persistir el diseño subido~~ — resuelto (2026-09-24), **solo en el
+   navegador** (`localStorage`, ver detalle abajo). Sigue sin viajar al
+   servidor ni ser compartible entre dispositivos — decisión explícita del
+   usuario para mantener el alcance chico (no hay todavía concepto de
+   "pedido"/turno guardado en este proyecto, es puramente un cotizador).
+5. Validar el v1 (motor de precio + vista 3D embebida) con LusiTattoo en
    uso real — recién con esa señal decidir si se invierte en la capa
-   paramétrica de peso/altura, en persistir el diseño subido, o en reposar
-   el modelo (hoy en T-pose).
+   paramétrica de peso/altura, en persistencia real del lado del servidor
+   (con link compartible), o en reposar el modelo (hoy en T-pose).

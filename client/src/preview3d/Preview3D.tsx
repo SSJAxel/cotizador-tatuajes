@@ -10,9 +10,10 @@ import type { ThreeEvent } from "@react-three/fiber";
 import { Decal, OrbitControls } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
-import { HumanoidBody } from "./HumanoidBody";
-import { NOMBRE_ZONA, ZONA_POR_PARTE } from "./types";
-import type { BodyPartName } from "./types";
+import { useHumanoidModel } from "./useHumanoidModel";
+import type { HumanoidModel } from "./useHumanoidModel";
+import { NOMBRE_ZONA, clasificarZona } from "./types";
+import type { ZonaCuerpo } from "./types";
 import "./preview3d.css";
 
 function useTexturaSubida(url: string | null) {
@@ -39,33 +40,27 @@ function useTexturaSubida(url: string | null) {
 }
 
 type ScenaProps = {
-  activePart: BodyPartName | null;
-  onPlace: (part: BodyPartName, localPos: THREE.Vector3) => void;
+  modelo: HumanoidModel;
+  onPlace: (zona: ZonaCuerpo, localPos: THREE.Vector3) => void;
   decalPos: [number, number, number];
   decalRoll: number;
   decalScale: number;
   textura: THREE.Texture | null;
+  hayDecal: boolean;
 };
 
 function Scena({
-  activePart,
+  modelo,
   onPlace,
   decalPos,
   decalRoll,
   decalScale,
   textura,
+  hayDecal,
 }: ScenaProps) {
   const { gl, camera, raycaster } = useThree();
-  const meshMapRef = useRef<Partial<Record<BodyPartName, THREE.Mesh>>>({});
   const arrastrandoRef = useRef(false);
   const controlsRef = useRef<OrbitControlsImpl | null>(null);
-
-  const getMeshRef = useCallback(
-    (part: BodyPartName) => (mesh: THREE.Mesh | null) => {
-      if (mesh) meshMapRef.current[part] = mesh;
-    },
-    [],
-  );
 
   const raycastarEn = useCallback(
     (clientX: number, clientY: number) => {
@@ -75,27 +70,30 @@ function Scena({
         -((clientY - rect.top) / rect.height) * 2 + 1,
       );
       raycaster.setFromCamera(ndc, camera);
-      const meshes = Object.values(meshMapRef.current).filter(
-        (m): m is THREE.Mesh => Boolean(m),
-      );
-      const hits = raycaster.intersectObjects(meshes, false);
+      const hits = raycaster.intersectObject(modelo.skinMesh, false);
       return hits[0] ?? null;
     },
-    [camera, gl, raycaster],
+    [camera, gl, raycaster, modelo],
+  );
+
+  const colocarDesdeHit = useCallback(
+    (point: THREE.Vector3) => {
+      const local = modelo.skinMesh.worldToLocal(point.clone());
+      const zona = clasificarZona(local, modelo.bbox);
+      onPlace(zona, local);
+    },
+    [modelo, onPlace],
   );
 
   const handlePointerDown = useCallback(
-    (part: BodyPartName) => (event: ThreeEvent<PointerEvent>) => {
+    (event: ThreeEvent<PointerEvent>) => {
       if (!textura) return;
       event.stopPropagation();
       arrastrandoRef.current = true;
       if (controlsRef.current) controlsRef.current.enabled = false;
-      const mesh = meshMapRef.current[part];
-      if (!mesh) return;
-      const local = mesh.worldToLocal(event.point.clone());
-      onPlace(part, local);
+      colocarDesdeHit(event.point);
     },
-    [onPlace, textura],
+    [colocarDesdeHit, textura],
   );
 
   useEffect(() => {
@@ -103,13 +101,7 @@ function Scena({
       if (!arrastrandoRef.current) return;
       const hit = raycastarEn(event.clientX, event.clientY);
       if (!hit) return;
-      const entrada = (
-        Object.entries(meshMapRef.current) as [BodyPartName, THREE.Mesh][]
-      ).find(([, mesh]) => mesh === hit.object);
-      if (!entrada) return;
-      const [part] = entrada;
-      const local = hit.object.worldToLocal(hit.point.clone());
-      onPlace(part, local);
+      colocarDesdeHit(hit.point);
     }
     function alSoltar() {
       arrastrandoRef.current = false;
@@ -122,27 +114,29 @@ function Scena({
       canvas.removeEventListener("pointermove", alMover);
       window.removeEventListener("pointerup", alSoltar);
     };
-  }, [gl, onPlace, raycastarEn]);
-
-  const renderDecal = (part: BodyPartName) => {
-    if (part !== activePart || !textura) return null;
-    return (
-      <Decal
-        position={decalPos}
-        rotation={decalRoll}
-        scale={decalScale}
-        map={textura}
-      />
-    );
-  };
+  }, [gl, raycastarEn, colocarDesdeHit]);
 
   return (
     <>
-      <HumanoidBody
-        getMeshRef={getMeshRef}
-        onPartPointerDown={handlePointerDown}
-        renderDecal={renderDecal}
-      />
+      <group scale={modelo.escala} position={modelo.offset}>
+        <primitive object={modelo.skinMesh} onPointerDown={handlePointerDown}>
+          {hayDecal && textura && (
+            <Decal
+              position={decalPos}
+              rotation={decalRoll}
+              scale={decalScale / modelo.escala}
+              map={textura}
+            />
+          )}
+        </primitive>
+        {modelo.eyeMesh && <primitive object={modelo.eyeMesh} />}
+      </group>
+
+      <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <circleGeometry args={[1.2, 32]} />
+        <meshStandardMaterial color="#171939" roughness={1} />
+      </mesh>
+
       <OrbitControls
         ref={controlsRef}
         target={[0, 1.1, 0]}
@@ -155,8 +149,9 @@ function Scena({
 }
 
 export function Preview3D() {
+  const modelo = useHumanoidModel();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [activePart, setActivePart] = useState<BodyPartName | null>(null);
+  const [activaZona, setActivaZona] = useState<ZonaCuerpo | null>(null);
   const [decalPos, setDecalPos] = useState<[number, number, number]>([
     0, 0, 0,
   ]);
@@ -166,8 +161,8 @@ export function Preview3D() {
   const textura = useTexturaSubida(imageUrl);
 
   const handlePlace = useCallback(
-    (part: BodyPartName, localPos: THREE.Vector3) => {
-      setActivePart(part);
+    (zona: ZonaCuerpo, localPos: THREE.Vector3) => {
+      setActivaZona(zona);
       setDecalPos([localPos.x, localPos.y, localPos.z]);
     },
     [],
@@ -188,9 +183,9 @@ export function Preview3D() {
       <aside className="preview3d__panel">
         <h2>Vista 3D (mock)</h2>
         <p className="preview3d__ayuda">
-          Cuerpo fijo, sin ajuste de peso/altura todavía — es la validación
-          barata antes de invertir en esa capa. Subí un diseño y arrastralo
-          sobre el torso, un brazo o una pierna.
+          Cuerpo real exportado de MakeHuman, sin ajuste de peso/altura
+          todavía — es la validación barata antes de invertir en esa capa.
+          Subí un diseño y arrastralo sobre el torso, un brazo o una pierna.
         </p>
 
         <label className="preview3d__campo">
@@ -198,13 +193,14 @@ export function Preview3D() {
           <input type="file" accept="image/*" onChange={handleArchivo} />
         </label>
 
-        {!textura && (
+        {!modelo && <p className="preview3d__aviso">Cargando modelo 3D…</p>}
+        {modelo && !textura && (
           <p className="preview3d__aviso">Subí una imagen para poder ubicarla.</p>
         )}
 
-        {activePart && textura && (
+        {activaZona && textura && (
           <p className="preview3d__zona">
-            Zona actual: <strong>{NOMBRE_ZONA[ZONA_POR_PARTE[activePart]]}</strong>
+            Zona actual: <strong>{NOMBRE_ZONA[activaZona]}</strong>
           </p>
         )}
 
@@ -215,7 +211,7 @@ export function Preview3D() {
             min={0}
             max={360}
             value={decalRollDeg}
-            disabled={!textura || !activePart}
+            disabled={!textura || !activaZona}
             onChange={(e) => setDecalRollDeg(Number(e.target.value))}
           />
         </label>
@@ -227,7 +223,7 @@ export function Preview3D() {
             min={10}
             max={60}
             value={decalScale * 100}
-            disabled={!textura || !activePart}
+            disabled={!textura || !activaZona}
             onChange={(e) => setDecalScale(Number(e.target.value) / 100)}
           />
         </label>
@@ -238,14 +234,17 @@ export function Preview3D() {
           <color attach="background" args={["#0f172a"]} />
           <ambientLight intensity={0.6} />
           <directionalLight position={[2, 3, 2]} intensity={1.1} castShadow />
-          <Scena
-            activePart={activePart}
-            onPlace={handlePlace}
-            decalPos={decalPos}
-            decalRoll={(decalRollDeg * Math.PI) / 180}
-            decalScale={decalScale}
-            textura={textura}
-          />
+          {modelo && (
+            <Scena
+              modelo={modelo}
+              onPlace={handlePlace}
+              decalPos={decalPos}
+              decalRoll={(decalRollDeg * Math.PI) / 180}
+              decalScale={decalScale}
+              textura={textura}
+              hayDecal={activaZona !== null}
+            />
+          )}
         </Canvas>
       </div>
     </div>

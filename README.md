@@ -172,37 +172,56 @@ paramétrica.
 
 ### Mock v1 implementado (2026-09-24)
 
-En vez de exportar un cuerpo desde MakeHuman (dependencia externa evitada a
-propósito para esta primera validación), el cuerpo fijo se armó con
-primitivas de Three.js (cápsulas para torso/brazos/piernas + esfera para la
-cabeza) — visualmente esquemático, pero suficiente para probar la mecánica
-de interacción antes de invertir en un modelo realista.
+Primera versión: cuerpo armado con primitivas de Three.js (cápsulas +
+esfera), sin depender todavía de MakeHuman, para validar la mecánica de
+drag/rotate/scale antes de invertir en un modelo realista.
 
-- `client/src/preview3d/` — `HumanoidBody.tsx` (geometría del cuerpo, 5
-  partes: torso, 2 brazos, 2 piernas, cada una con su propia malla),
-  `Preview3D.tsx` (escena de React Three Fiber, lógica de drag/rotate/scale,
-  panel lateral con los controles), `types.ts` (nombres de parte/zona).
-- Interacción: click+arrastre sobre cualquier parte del cuerpo reposiciona
-  el diseño ahí (raycasting manual contra las 5 mallas, no el sistema de
-  eventos por-mesh de React Three Fiber, para que el arrastre no se corte al
-  salir del contorno proyectado de la malla en pantalla). Sliders aparte
-  para rotación (0-360°, roll sobre la normal de la superficie) y tamaño.
-  El decal usa `@react-three/drei`'s `<Decal>`, que orienta automáticamente
-  el diseño a la normal más cercana del punto elegido.
-- Zonas: torso, brazo (izquierdo o derecho), pierna (izquierda o derecha) —
-  cualquiera de las 5 mallas es un target de drag válido, el label de "zona
-  actual" en el panel se deriva de en cuál cayó el último click.
-- Nueva pestaña "Vista 3D (beta)" en `App.tsx`, tercera opción del switch
-  existente (antes solo Cotizador/Configuración).
+### Cuerpo real de MakeHuman integrado (2026-09-24)
+
+Se instaló MakeHuman Community 1.2.0 (instalador oficial, portable, bajado
+de `download.tuxfamily.org/makehuman`) y se exportó un cuerpo en formato
+**Wavefront OBJ** (el único formato nativo de MakeHuman sin pasar por
+Blender/plugins) — reemplaza las cápsulas del mock v1 por una malla humana
+real (~14.400 caras, piel + ojos como materiales separados).
+
+- Export copiado a `client/public/models/human-body.{obj,mtl}` +
+  `client/public/models/textures/brown_eye.png`. Cargado con los
+  `OBJLoader`/`MTLLoader` que ya trae el paquete `three`
+  (`three/examples/jsm/loaders/`), sin dependencias nuevas.
+- `client/src/preview3d/useHumanoidModel.ts`: hook que carga el OBJ+MTL,
+  separa la malla de piel (material `DefaultSkin`, único target de
+  drag/decal) de la de ojos (material `Eye_brown`, no interactiva), calcula
+  el bounding box crudo y normaliza el modelo a 1.75 unidades de alto,
+  centrado en el origen con los pies en `y=0`.
+- **Cambio de arquitectura de zonas**: al ser ahora UNA sola malla continua
+  (no 5 mallas separadas como en el mock v1), la zona ("torso"/"brazo"/
+  "pierna") ya no se deriva de qué mesh se tocó, sino de la posición del
+  punto de click normalizada contra el bounding box (`clasificarZona` en
+  `types.ts`) — corte simple por altura relativa + distancia al eje central.
+  Verificado en navegador real: torso, pierna y brazo clasifican bien.
+- **Gotcha de escala del `Decal`**: la geometría del decal se calcula en el
+  espacio local CRUDO del OBJ (donde el cuerpo mide ~19.5 unidades de alto,
+  no las 1.75 normalizadas) — el valor de tamaño del slider (pensado en la
+  escala normalizada) hay que dividirlo por `modelo.escala` antes de
+  pasarlo a `<Decal scale={...}>`, si no el diseño queda invisible de tan
+  chico.
+- **El export viene en T-pose** (brazos extendidos horizontalmente — pose
+  de rigging estándar, no una pose relajada) porque Wavefront OBJ no tiene
+  huesos: lo que se exporta es la malla ya deformada, en la pose que se
+  ve en la pantalla de MakeHuman al momento de exportar. Para una pose más
+  natural (brazos a los costados), se puede volver a exportar aplicando una
+  pose desde la pestaña Pose/Animate de MakeHuman antes de exportar — no
+  hecho todavía, la clasificación de zona por X asume brazos separados del
+  torso (como en T-pose) y habría que revisar el umbral si se cambia la
+  pose.
 - Probado en navegador real con Playwright (instalado y desinstalado
-  temporalmente, mismo patrón que el resto del proyecto): subir imagen,
-  arrastrar sobre el torso, rotar, escalar, arrastrar a una pierna — sin
-  errores de consola propios.
-- Limitación conocida y esperada del mock: sigue sin peso/altura ajustable
-  (es exactamente lo que este v1 barato buscaba evitar hasta validar que la
-  idea engancha). El decal en las cápsulas de brazo/pierna se distorsiona
-  más notoriamente que en el torso por el radio más chico — mismo gotcha de
-  curvas fuertes ya anticipado en la investigación técnica de arriba.
+  temporalmente, mismo patrón de siempre): drag sobre torso, pierna y
+  brazo, cada uno clasificó la zona correcta y el decal se proyectó bien
+  sobre la curvatura real de la malla — mejor wrap que con las cápsulas del
+  mock v1. Sin errores de consola propios.
+- Sigue pendiente: sin peso/altura ajustable (deliberado, próxima fase si
+  el mock engancha), sin reposar el modelo a una postura natural, sin
+  conexión al flujo real de `QuoteForm.tsx`.
 
 ## Investigación de competencia
 

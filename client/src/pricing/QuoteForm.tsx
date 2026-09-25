@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ETIQUETAS } from "./fixtures";
 import type { QuoteInput, QuoteResult, TenantPublicOptions } from "./types";
+import { Preview3D } from "../preview3d/Preview3D";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 // Único tenant hoy — cuando exista selección/auth de tenant real, esto deja
@@ -14,6 +15,7 @@ export function QuoteForm() {
   const [resultado, setResultado] = useState<QuoteResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [mostrarVista3D, setMostrarVista3D] = useState(false);
 
   useEffect(() => {
     fetch(`${API_URL}/tenants/${TENANT_SLUG}/options`)
@@ -253,6 +255,25 @@ export function QuoteForm() {
           )}
         </aside>
       </div>
+
+      <section className="quote-3d-toggle">
+        <div>
+          <h2>¿Querés ver cómo quedaría?</h2>
+          <p className="disclaimer">
+            Subí tu diseño de referencia y probalo sobre un cuerpo en 3D antes
+            de agendar. Es una vista aproximada, no afecta el precio.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={() => setMostrarVista3D((v) => !v)}
+        >
+          {mostrarVista3D ? "Ocultar vista previa 3D" : "Mostrar vista previa 3D"}
+        </button>
+      </section>
+
+      {mostrarVista3D && <Preview3D />}
     </div>
   );
 }

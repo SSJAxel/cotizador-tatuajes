@@ -181,11 +181,11 @@ export function Preview3D() {
   return (
     <div className="preview3d">
       <aside className="preview3d__panel">
-        <h2>Vista 3D (mock)</h2>
+        <h2>Vista previa en 3D</h2>
         <p className="preview3d__ayuda">
-          Cuerpo real exportado de MakeHuman, sin ajuste de peso/altura
-          todavía — es la validación barata antes de invertir en esa capa.
-          Subí un diseño y arrastralo sobre el torso, un brazo o una pierna.
+          Subí una foto o imagen de tu diseño y arrastralo sobre el torso, un
+          brazo o una pierna para ver cómo quedaría. Es una vista aproximada
+          — el resultado final depende del trabajo del tatuador.
         </p>
 
         <label className="preview3d__campo">

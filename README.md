@@ -348,7 +348,11 @@ navegador real (Playwright):
 - `client/` — React + Vite + TypeScript, con dos pantallas (switch arriba
   de todo, sin router — `App.tsx`):
   - **Cotizador (cliente)** — `src/pricing/QuoteForm.tsx`, carga sus
-    opciones desde `GET /tenants/:slug/options` (público).
+    opciones desde `GET /tenants/:slug/options` (público). Debajo del
+    formulario/resultado tiene un toggle "Mostrar vista previa 3D" que monta
+    `src/preview3d/Preview3D.tsx` (ver sección "Cuerpo real de MakeHuman
+    integrado" más abajo) — no forma parte del cálculo de precio, es solo
+    una ayuda visual para el cliente.
   - **Configuración (tatuador)** — `src/pricing/TenantConfigForm.tsx`.
     Flujo: escribís un slug → el cliente chequea contra `/options`
     (público) si ya existe → si no existe, mostrás "Crear tenant" con
@@ -382,9 +386,13 @@ navegador real (Playwright):
    no hay recuperación de contraseña ni cambio de contraseña todavía (si
    alguien la pierde, hoy no hay forma de recuperar el tenant).
 2. ~~Mock de la vista 3D~~ — resuelto (2026-09-24), ver detalle arriba.
-   Pendiente real que queda: no está conectado a `QuoteForm.tsx` (vive como
-   pestaña aparte, no como parte del flujo de cotización real), y el diseño
-   subido no persiste ni viaja a la cotización.
-3. Validar el v1 (motor de precio + este mock 3D) con LusiTattoo en uso
-   real — recién con esa señal decidir si se invierte en la capa
-   paramétrica de peso/altura o en integrar el 3D al flujo de cotización.
+3. ~~Conectar el 3D al flujo real de `QuoteForm.tsx`~~ — resuelto
+   (2026-09-24): ya no es una pestaña aparte, vive dentro de la página del
+   cotizador cliente detrás de un toggle "Mostrar vista previa 3D" (se monta
+   recién al abrirlo, para no cargar Three.js/el modelo en cada visita).
+   Pendiente real que queda: el diseño subido sigue sin persistir — si el
+   cliente cierra o recarga la página, se pierde; no viaja al pedido/turno.
+4. Validar el v1 (motor de precio + vista 3D embebida) con LusiTattoo en
+   uso real — recién con esa señal decidir si se invierte en la capa
+   paramétrica de peso/altura, en persistir el diseño subido, o en reposar
+   el modelo (hoy en T-pose).

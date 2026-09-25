@@ -73,13 +73,6 @@ async function main() {
           { nombre: "realismo_color", multiplicadorHoras: 1.85 },
         ],
       },
-      especializaciones: {
-        create: [
-          { nivel: "cualquiera_del_estudio", multiplicadorTarifa: 1.0 },
-          { nivel: "pocos_en_la_zona", multiplicadorTarifa: 1.3 },
-          { nivel: "soy_el_unico", multiplicadorTarifa: 1.7 },
-        ],
-      },
       calidadesProducto: {
         create: [
           { nivel: "estandar", costoFijo: 0 },

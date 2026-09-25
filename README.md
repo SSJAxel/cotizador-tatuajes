@@ -189,20 +189,20 @@ código.
 ```
 horas_estimadas  = (tamaño_cm / cm_por_hora) × dificultad[zona] × mult_horas[técnica]
                     // redondeado hacia arriba en pasos de media hora
-tarifa_efectiva  = tarifa_horaria × mult_tarifa[especialización]
-precio_base      = max(mínimo_estudio, tarifa_efectiva × horas_estimadas)
+precio_base      = max(mínimo_estudio, tarifa_horaria × horas_estimadas)
 precio_con_extras = precio_base + costo_fijo[calidad_producto]
 precio_final     = precio_con_extras × (1 + recargo_%[horario])
 ```
+
+> Nota (2026-09-25): esta fórmula ya refleja la eliminación de "nivel de
+> especialización" — ver sección propia más abajo para el porqué. La tarifa
+> horaria es única por tenant, sin multiplicador aparte.
 
 Diferencias clave respecto al modelo superado:
 
 - **Tamaño, zona y técnica ya no fijan un precio** — ajustan la ESTIMACIÓN DE
   HORAS. Zona pesa por dificultad (curvas/movimiento, no por precio de
   venta); técnica pesa por densidad de detalle/sombreado/color.
-- **Especialización multiplica la TARIFA, no un subtotal** — un nivel más
-  solicitado/único cobra más por hora, coherente con cómo funciona en la
-  realidad (no es un extra fijo bolted-on).
 - **Mínimo de estudio nuevo**: piso de precio real que no existía antes.
 - **Cantidad de tintas y cantidad de agujas se sacaron por completo** como
   variables de cotización — ni el cliente las elige ni el tatuador las
@@ -223,16 +223,14 @@ TenantPricingConfig {
   cmPorHora: number            // velocidad de referencia, no un precio
   dificultadPorZona: [ { zona: string, multiplicador: number } ]   // >1 = más lento/difícil
   tecnicas:          [ { nombre: string, multiplicadorHoras: number } ]  // >1 = más horas
-  especializacion:   [ { nivel: string, multiplicadorTarifa: number } ]  // multiplica la tarifa
   calidadProducto:   [ { nivel: string, costoFijo: number } ]      // extra opcional real
   horarios:          [ { franja: string, recargoPorcentual: number } ]
 }
 
-QuoteInput {   // lo completa el CLIENTE — ya no incluye cantidadAgujas
+QuoteInput {   // lo completa el CLIENTE — ya no incluye cantidadAgujas ni especializacion
   tamanoCm: number
   zona: string
   tecnica: string
-  especializacion: string
   calidadProducto: string
   horario: string
 }
@@ -243,9 +241,9 @@ Implementado en `server/src/pricing/{types,calculate,validateConfig,tenantConfig
 `ZonaPrecio`, se sacaron las columnas de agujas de `Tenant`), y espejado a
 mano en `client/src/pricing/types.ts` + los formularios (`QuoteForm.tsx`,
 `TenantConfigForm.tsx`). 8 tests de `calculate.test.ts` cubren el caso base,
-el ajuste de especialización sobre la tarifa (no el subtotal), el redondeo
-de horas, el piso de mínimo de estudio, el extra de calidad, el recargo de
-horario y el rechazo de zonas inválidas.
+el multiplicador de horas de la técnica, el redondeo de horas, el piso de
+mínimo de estudio, el extra de calidad, el recargo de horario y el rechazo
+de zonas inválidas.
 
 **Gotcha encontrado al probar el formulario de configuración con números
 reales** (no enteros redondos): los inputs de multiplicador tenían
@@ -295,7 +293,7 @@ grounded en esa investigación:
 
 **Nuevo: botón "Cargar plantilla estándar"** en `TenantConfigForm.tsx` — sin
 esto, un tenant nuevo tendría que tipear 28 filas de zona a mano (más
-técnicas/especialización/calidad/horarios) para tener un punto de partida
+técnicas/calidad/horarios) para tener un punto de partida
 razonable. El botón carga `PLANTILLA_ESTANDAR` (nuevo export de
 `client/src/pricing/fixtures.ts`, mismos valores que `EJEMPLO_CONFIG` del
 server) completo, preservando `nombre`/`moneda` si el tenant ya los había
@@ -347,6 +345,37 @@ no se tocó y sigue en verde.
 
 Verificado en navegador real: el select de técnica del cliente muestra las
 18 etiquetas, cotizar con "Realismo a color" da el precio esperado a mano.
+
+### "Nivel de especialización" eliminado del motor (2026-09-25)
+
+El usuario cuestionó la variable: "soy el único que lo hace" es una
+afirmación subjetiva y no verificable, y en el formulario público era el
+**cliente** quien la elegía — raro, ¿por qué pedirle a un cliente que declare
+"quiero el nivel donde sos el único que lo hace"? La investigación del
+rediseño de horas×tarifa ya lo había anticipado sin que se sacara del todo:
+*"un tatuador muy solicitado no aplica un multiplicador sobre una base
+compartida — directamente cobra más por hora"*. Es decir, la
+reputación/especialización del artista ya debería estar reflejada en su
+única `tarifaHoraria`, no ser un multiplicador aparte elegible por
+cotización.
+
+**Sacado por completo**: `TenantPricingConfig.especializacion`,
+`QuoteInput.especializacion`, el modelo `NivelEspecializacion` de Prisma, el
+fieldset "Niveles de especialización" en `TenantConfigForm.tsx`, el select
+"Nivel de especialización requerido" en `QuoteForm.tsx`, y
+`multEspecializacion`/`tarifaEfectiva` de `QuoteResult.desglose` (ya no hace
+falta esa distinción — `tarifaHoraria` es la única tarifa).
+
+**Camino correcto si hace falta esto en el futuro**: un estudio con varios
+tatuadores a tarifas distintas necesita soporte **multi-artista real** (cada
+uno con su propia `tarifaHoraria`, el cliente elige o le asignan un artista)
+— no un dropdown subjetivo sobre una tarifa compartida. No implementado,
+fuera de alcance por ahora (LusiTattoo es un tenant de un solo artista).
+
+`calculate.test.ts` se actualizó (el test que verificaba el multiplicador de
+especialización se reescribió para verificar solo el multiplicador de horas
+de la técnica) — sigue en 8/8 verde. `lusitattoo` también se actualizó vía
+API para sacarle el campo.
 
 ## Vista 3D (v2 — investigada, no iniciada)
 
@@ -562,9 +591,9 @@ navegador real (Playwright):
 
 - `server/` — Express + TypeScript + Prisma/Postgres.
   - `GET /tenants/:slug/options` — devuelve `TenantPublicOptions`: solo
-    nombres de zonas/técnicas/especialización/calidad/horarios, sin
-    ningún precio ni multiplicador. Sin auth — es lo que consume el
-    formulario público del cliente final (`QuoteForm.tsx`).
+    nombres de zonas/técnicas/calidad/horarios, sin ningún precio ni
+    multiplicador. Sin auth — es lo que consume el formulario público del
+    cliente final (`QuoteForm.tsx`).
   - `POST /tenants/:slug/register` — crea la CUENTA de un tenant nuevo
     (`{ password }`, mínimo 8 caracteres). No recibe config de precio
     todavía (eso se completa después, ya autenticado, vía `PUT /config`

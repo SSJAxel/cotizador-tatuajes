@@ -20,13 +20,6 @@ export function calcularCotizacion(config: TenantPricingConfig, input: QuoteInpu
     throw new Error(`No hay técnica configurada "${input.tecnica}".`);
   }
 
-  const especializacionConfig = config.especializacion.find(
-    (e) => e.nivel === input.especializacion,
-  );
-  if (!especializacionConfig) {
-    throw new Error(`No hay nivel de especialización configurado "${input.especializacion}".`);
-  }
-
   const calidadConfig = config.calidadProducto.find((c) => c.nivel === input.calidadProducto);
   if (!calidadConfig) {
     throw new Error(`No hay costo configurado para la calidad de producto "${input.calidadProducto}".`);
@@ -45,10 +38,9 @@ export function calcularCotizacion(config: TenantPricingConfig, input: QuoteInpu
     horasBase * zonaConfig.multiplicador * tecnicaConfig.multiplicadorHoras,
   );
 
-  // La especialización ajusta la TARIFA (un artista más solicitado cobra
-  // más por hora), no un multiplicador sobre un subtotal compartido.
-  const tarifaEfectiva = config.tarifaHoraria * especializacionConfig.multiplicadorTarifa;
-  const precioBase = Math.max(config.minimoEstudio, tarifaEfectiva * horasEstimadas);
+  // La tarifa horaria ya refleja reputación/experiencia del tatuador — sin
+  // multiplicador aparte de "especialización" (sacado 2026-09-25).
+  const precioBase = Math.max(config.minimoEstudio, config.tarifaHoraria * horasEstimadas);
   const precioConExtras = precioBase + calidadConfig.costoFijo;
   const precioFinal = precioConExtras * (1 + horarioConfig.recargoPorcentual / 100);
 
@@ -57,8 +49,6 @@ export function calcularCotizacion(config: TenantPricingConfig, input: QuoteInpu
     desglose: {
       horasEstimadas,
       tarifaHoraria: config.tarifaHoraria,
-      multEspecializacion: especializacionConfig.multiplicadorTarifa,
-      tarifaEfectiva,
       minimoEstudio: config.minimoEstudio,
       precioBase: Math.round(precioBase * 100) / 100,
       costoCalidadProducto: calidadConfig.costoFijo,

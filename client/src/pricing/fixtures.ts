@@ -54,10 +54,7 @@ export const ETIQUETAS: Record<string, string> = {
   puntillismo: "Puntillismo (dotwork)",
   realismo_color: "Realismo a color",
 
-  // Especialización, calidad, horarios
-  cualquiera_del_estudio: "Cualquiera del estudio",
-  pocos_en_la_zona: "Pocos en la zona lo hacen",
-  soy_el_unico: "Soy el único que lo hace",
+  // Calidad, horarios
   estandar: "Estándar",
   premium: "Premium",
   horario_habitual: "Horario habitual",
@@ -131,11 +128,6 @@ export const PLANTILLA_ESTANDAR: TenantPricingConfig = {
     { nombre: "aguja_unica", multiplicadorHoras: 1.7 },
     { nombre: "puntillismo", multiplicadorHoras: 1.75 },
     { nombre: "realismo_color", multiplicadorHoras: 1.85 },
-  ],
-  especializacion: [
-    { nivel: "cualquiera_del_estudio", multiplicadorTarifa: 1.0 },
-    { nivel: "pocos_en_la_zona", multiplicadorTarifa: 1.3 },
-    { nivel: "soy_el_unico", multiplicadorTarifa: 1.7 },
   ],
   calidadProducto: [
     { nivel: "estandar", costoFijo: 0 },

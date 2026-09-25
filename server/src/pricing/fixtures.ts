@@ -70,11 +70,6 @@ export const EJEMPLO_CONFIG: TenantPricingConfig = {
     { nombre: "puntillismo", multiplicadorHoras: 1.75 },
     { nombre: "realismo_color", multiplicadorHoras: 1.85 },
   ],
-  especializacion: [
-    { nivel: "cualquiera_del_estudio", multiplicadorTarifa: 1.0 },
-    { nivel: "pocos_en_la_zona", multiplicadorTarifa: 1.3 },
-    { nivel: "soy_el_unico", multiplicadorTarifa: 1.7 },
-  ],
   calidadProducto: [
     { nivel: "estandar", costoFijo: 0 },
     { nivel: "premium", costoFijo: 8000 },

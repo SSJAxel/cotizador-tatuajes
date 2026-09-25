@@ -30,7 +30,6 @@ export function QuoteForm() {
           tamanoCm: 10,
           zona: cfg.zonas[0],
           tecnica: cfg.tecnicas[0],
-          especializacion: cfg.especializacion[0],
           calidadProducto: cfg.calidadProducto[0],
           horario: cfg.horarios[0],
         });
@@ -140,20 +139,6 @@ export function QuoteForm() {
             </label>
 
             <label>
-              Nivel de especialización requerido
-              <select
-                value={input.especializacion}
-                onChange={(e) => actualizar("especializacion", e.target.value)}
-              >
-                {config.especializacion.map((nivel) => (
-                  <option key={nivel} value={nivel}>
-                    {ETIQUETAS[nivel] ?? nivel}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
               Calidad de producto
               <select
                 value={input.calidadProducto}
@@ -208,16 +193,6 @@ export function QuoteForm() {
                     <span>Tarifa horaria</span>
                     <span>
                       {config.moneda} {resultado.desglose.tarifaHoraria.toLocaleString("es-AR")}/h
-                    </span>
-                  </li>
-                  <li>
-                    <span>Multiplicador especialización</span>
-                    <span>×{resultado.desglose.multEspecializacion}</span>
-                  </li>
-                  <li>
-                    <span>Tarifa efectiva</span>
-                    <span>
-                      {config.moneda} {resultado.desglose.tarifaEfectiva.toLocaleString("es-AR")}/h
                     </span>
                   </li>
                   <li>

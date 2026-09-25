@@ -13,7 +13,6 @@ const CONFIG_VACIA: TenantPricingConfig = {
   cmPorHora: 1,
   dificultadPorZona: [{ zona: "", multiplicador: 1 }],
   tecnicas: [{ nombre: "", multiplicadorHoras: 1 }],
-  especializacion: [{ nivel: "", multiplicadorTarifa: 1 }],
   calidadProducto: [{ nivel: "", costoFijo: 0 }],
   horarios: [{ franja: "", recargoPorcentual: 0 }],
 };
@@ -401,70 +400,6 @@ export function TenantConfigForm() {
               }
             >
               + Agregar técnica
-            </button>
-          </fieldset>
-
-          <fieldset>
-            <legend>Niveles de especialización</legend>
-            <p className="disclaimer">
-              Multiplicador sobre tu tarifa horaria (no sobre el precio final) — un
-              nivel más solicitado/único cobra más por hora, no un extra fijo.
-            </p>
-            {config.especializacion.map((esp, i) => (
-              <div className="fila-lista" key={i}>
-                <input
-                  placeholder="nivel (ej. soy_el_unico)"
-                  value={esp.nivel}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      especializacion: actualizarEnLista(config.especializacion, i, {
-                        nivel: e.target.value,
-                      }),
-                    })
-                  }
-                />
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  placeholder="multiplicador de tarifa (ej. 1.0)"
-                  value={esp.multiplicadorTarifa}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      especializacion: actualizarEnLista(config.especializacion, i, {
-                        multiplicadorTarifa: Number(e.target.value),
-                      }),
-                    })
-                  }
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setConfig({
-                      ...config,
-                      especializacion: config.especializacion.filter((_, j) => j !== i),
-                    })
-                  }
-                >
-                  Quitar
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                setConfig({
-                  ...config,
-                  especializacion: [
-                    ...config.especializacion,
-                    { nivel: "", multiplicadorTarifa: 1 },
-                  ],
-                })
-              }
-            >
-              + Agregar nivel
             </button>
           </fieldset>
 

@@ -3,8 +3,10 @@
 
 /**
  * Modelo de precio basado en TIEMPO, no en tamaño (ver investigación de
- * mercado 2026-09-24 en el README del server). Tamaño, zona y técnica
- * ajustan la ESTIMACIÓN DE HORAS; la especialización ajusta la TARIFA.
+ * mercado 2026-09-24/25 en el README del server). Tamaño, zona y técnica
+ * ajustan la ESTIMACIÓN DE HORAS. Sin "nivel de especialización" (sacado
+ * 2026-09-25): la reputación/demanda de un artista ya está reflejada en su
+ * única tarifaHoraria, no es un multiplicador aparte elegible por cotización.
  */
 export interface TenantPricingConfig {
   nombre: string;
@@ -14,7 +16,6 @@ export interface TenantPricingConfig {
   cmPorHora: number;
   dificultadPorZona: { zona: string; multiplicador: number }[];
   tecnicas: { nombre: string; multiplicadorHoras: number }[];
-  especializacion: { nivel: string; multiplicadorTarifa: number }[];
   calidadProducto: { nivel: string; costoFijo: number }[];
   horarios: { franja: string; recargoPorcentual: number }[];
 }
@@ -29,7 +30,6 @@ export interface TenantPublicOptions {
   moneda: string;
   zonas: string[];
   tecnicas: string[];
-  especializacion: string[];
   calidadProducto: string[];
   horarios: string[];
 }
@@ -39,7 +39,6 @@ export interface QuoteInput {
   tamanoCm: number;
   zona: string;
   tecnica: string;
-  especializacion: string;
   calidadProducto: string;
   horario: string;
 }
@@ -53,8 +52,6 @@ export interface QuoteResult {
   desglose: {
     horasEstimadas: number;
     tarifaHoraria: number;
-    multEspecializacion: number;
-    tarifaEfectiva: number;
     minimoEstudio: number;
     precioBase: number;
     costoCalidadProducto: number;

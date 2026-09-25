@@ -65,16 +65,6 @@ export function validarConfigTenant(config: TenantPricingConfig) {
     requiereNumeroNoNegativo(`multiplicadorHoras de "${t.nombre}"`, t.multiplicadorHoras);
   }
 
-  requiereListaNoVacia("especializacion", config.especializacion);
-  requiereSinDuplicados(
-    "especializacion",
-    config.especializacion.map((e) => e.nivel),
-  );
-  for (const e of config.especializacion) {
-    requiereTextoNoVacio("nivel de especialización", e.nivel);
-    requiereNumeroNoNegativo(`multiplicadorTarifa de "${e.nivel}"`, e.multiplicadorTarifa);
-  }
-
   requiereListaNoVacia("calidadProducto", config.calidadProducto);
   requiereSinDuplicados(
     "calidadProducto",

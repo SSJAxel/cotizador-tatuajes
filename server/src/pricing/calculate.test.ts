@@ -7,7 +7,6 @@ const baseInput: QuoteInput = {
   tamanoCm: 10,
   zona: "brazo",
   tecnica: "lineas_finas",
-  especializacion: "cualquiera_del_estudio",
   calidadProducto: "estandar",
   horario: "horario_habitual",
 };
@@ -21,18 +20,17 @@ describe("calcularCotizacion", () => {
     expect(resultado.precioEstimado).toBe(62500);
   });
 
-  it("la especialización ajusta la tarifa efectiva, no un subtotal por tamaño", () => {
+  it("una técnica con más multiplicadorHoras aumenta las horas, no la tarifa", () => {
     const resultado = calcularCotizacion(EJEMPLO_CONFIG, {
       ...baseInput,
       tecnica: "realismo",
-      especializacion: "soy_el_unico",
     });
     // horas = 2.5h * 1.6 (realismo) = 4h
-    // tarifa efectiva = 25000 * 1.7 (soy_el_unico) = 42500
-    // precio = 4h * 42500 = 170000
+    // la tarifa horaria no cambia — sin multiplicador de "especialización"
+    // (sacado 2026-09-25, ver README)
     expect(resultado.desglose.horasEstimadas).toBe(4);
-    expect(resultado.desglose.tarifaEfectiva).toBe(42500);
-    expect(resultado.precioEstimado).toBe(170000);
+    expect(resultado.desglose.tarifaHoraria).toBe(25000);
+    expect(resultado.precioEstimado).toBe(100000);
   });
 
   it("redondea las horas estimadas hacia arriba en pasos de media hora", () => {

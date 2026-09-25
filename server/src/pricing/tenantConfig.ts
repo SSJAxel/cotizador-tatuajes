@@ -15,7 +15,6 @@ export async function cargarConfigTenant(slug: string): Promise<TenantPricingCon
     include: {
       zonas: true,
       tecnicas: true,
-      especializaciones: true,
       calidadesProducto: true,
       horarios: true,
     },
@@ -33,10 +32,6 @@ export async function cargarConfigTenant(slug: string): Promise<TenantPricingCon
     tecnicas: tenant.tecnicas.map((t) => ({
       nombre: t.nombre,
       multiplicadorHoras: t.multiplicadorHoras,
-    })),
-    especializacion: tenant.especializaciones.map((e) => ({
-      nivel: e.nivel,
-      multiplicadorTarifa: e.multiplicadorTarifa,
     })),
     calidadProducto: tenant.calidadesProducto.map((c) => ({
       nivel: c.nivel,
@@ -64,7 +59,6 @@ export async function cargarOpcionesPublicas(slug: string): Promise<TenantPublic
     moneda: config.moneda,
     zonas: config.dificultadPorZona.map((z) => z.zona),
     tecnicas: config.tecnicas.map((t) => t.nombre),
-    especializacion: config.especializacion.map((e) => e.nivel),
     calidadProducto: config.calidadProducto.map((c) => c.nivel),
     horarios: config.horarios.map((h) => h.franja),
   };
@@ -84,7 +78,6 @@ export async function buscarTenantParaLogin(
 async function reemplazarListasDePrecio(tenantId: string, config: TenantPricingConfig) {
   await prisma.zonaDificultad.deleteMany({ where: { tenantId } });
   await prisma.tecnica.deleteMany({ where: { tenantId } });
-  await prisma.nivelEspecializacion.deleteMany({ where: { tenantId } });
   await prisma.calidadProducto.deleteMany({ where: { tenantId } });
   await prisma.horario.deleteMany({ where: { tenantId } });
 
@@ -100,13 +93,6 @@ async function reemplazarListasDePrecio(tenantId: string, config: TenantPricingC
       tenantId,
       nombre: t.nombre,
       multiplicadorHoras: t.multiplicadorHoras,
-    })),
-  });
-  await prisma.nivelEspecializacion.createMany({
-    data: config.especializacion.map((e) => ({
-      tenantId,
-      nivel: e.nivel,
-      multiplicadorTarifa: e.multiplicadorTarifa,
     })),
   });
   await prisma.calidadProducto.createMany({

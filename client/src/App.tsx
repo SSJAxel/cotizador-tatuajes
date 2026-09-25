@@ -27,8 +27,15 @@ function App() {
         </button>
       </nav>
 
-      {vista === "cliente" && <QuoteForm />}
-      {vista === "tatuador" && <TenantConfigForm />}
+      {/* Se mantienen ambas montadas (nunca desmontadas) para no perder la
+          sesión de Configuración (token/config en memoria) ni el progreso
+          del formulario de cotización al cambiar de pestaña. */}
+      <div className={vista === "cliente" ? undefined : "vista-oculta"}>
+        <QuoteForm />
+      </div>
+      <div className={vista === "tatuador" ? undefined : "vista-oculta"}>
+        <TenantConfigForm />
+      </div>
     </div>
   );
 }

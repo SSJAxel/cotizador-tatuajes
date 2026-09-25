@@ -32,6 +32,10 @@
   color: var(--color-on-primary);
 }
 
+.vista-oculta {
+  display: none;
+}
+
 /* ---------- Cotizador (cliente) ---------- */
 .quote-page {
   width: 100%;

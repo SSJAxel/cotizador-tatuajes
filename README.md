@@ -527,6 +527,14 @@ navegador real (Playwright):
     obtenido, `GET`/`PUT /config` para editar y guardar. Botón "Cerrar
     sesión" descarta el token (solo vive en memoria del componente, no en
     localStorage — hay que loguearse de nuevo si se recarga la página).
+    **Gotcha corregido (2026-09-25):** `App.tsx` desmontaba por completo
+    `TenantConfigForm`/`QuoteForm` al cambiar de pestaña (`{vista === "x" &&
+    <Componente/>}`), perdiendo la sesión (token, config cargada) con solo
+    cambiar de pestaña, sin ni siquiera recargar la página. Ahora ambas
+    quedan siempre montadas y se ocultan con `display: none` (clase
+    `.vista-oculta`) — cambiar de pestaña ya no destruye el estado. Sigue
+    perdiéndose al recargar la página de verdad (eso es el límite conocido
+    de arriba, sin resolver todavía).
   - Probado de punta a punta en navegador real con Playwright (instalado
     y desinstalado temporalmente): crear tenant nuevo → cargar precios →
     guardar → cerrar sesión → login con password incorrecta (rechazado)

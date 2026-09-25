@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import type { AuthResponse, TenantPricingConfig } from "./types";
+import { PLANTILLA_ESTANDAR } from "./fixtures";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 const PASSWORD_MIN_LARGO = 8;
@@ -215,6 +216,20 @@ export function TenantConfigForm() {
               Cerrar sesión
             </button>
           </div>
+
+          <p className="disclaimer">
+            ¿Recién empezás a configurar? Cargá un punto de partida con 28 zonas del
+            cuerpo, técnicas y niveles ya cargados con valores de referencia — después
+            ajustá lo que quieras a tu realidad.
+          </p>
+          <button
+            type="button"
+            onClick={() =>
+              setConfig({ ...PLANTILLA_ESTANDAR, nombre: config.nombre, moneda: config.moneda })
+            }
+          >
+            Cargar plantilla estándar
+          </button>
 
           <label>
             Nombre del estudio

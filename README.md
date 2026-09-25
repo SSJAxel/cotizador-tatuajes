@@ -268,6 +268,56 @@ por API que `lusitattoo` cotiza igual que `demo` con los mismos inputs
 (mismo estándar de números, ver Vault para el detalle de por qué se usó el
 mismo estándar para ambos tenants).
 
+### Zonas del cuerpo: de 5 genéricas a 28 granulares (2026-09-25)
+
+El usuario pidió subdividir mucho las zonas del cuerpo para ganar precisión,
+apuntando a que esto sea un diferenciador serio del producto. Investigación
+adicional de pain charts / guías de placement de tatuajes confirmó que la
+industria real ya distingue muchas más zonas de las que teníamos — incluso
+dentro de una misma región general el precio varía fuerte: costillas cuesta
+hasta el doble que antebrazo en algunas fuentes (la piel se mueve con la
+respiración), codo/rodilla/esternón son los puntos más dolorosos y difíciles
+de tatuar por lo óseo/fino de la piel y lo poco que se puede estirar.
+
+**28 zonas nuevas** reemplazan las 5 genéricas anteriores
+(brazo/espalda/pierna/pecho/cuello), con multiplicador de dificultad
+grounded en esa investigación:
+
+| Rango | Zonas | Por qué |
+| --- | --- | --- |
+| 0.85 – 0.95 (más rápido) | espalda alta, espalda media, muslo, glúteo, pantorrilla, zona lumbar | superficies grandes, planas, meaty — el terreno "fácil" clásico |
+| 1.0 (ancla) | **brazo**, antebrazo, tríceps, hombro, abdomen | sin dificultad extra — `brazo` se mantiene en 1.0 a propósito, es la referencia histórica de `cmPorHora` y de los tests |
+| 1.05 – 1.2 | pecho, nuca, muslo interno, cuello, cadera, muñeca, axila, espinilla | algo de sensibilidad/curvatura, sin llegar a hueso directo |
+| 1.3 – 1.55 (más lento/doloroso) | clavícula, columna, tobillo, mano, pie, costillas, codo, rodilla, esternón | hueso pegado a la piel, poca almohadilla de grasa/músculo, o movimiento (costillas con la respiración) |
+
+`brazo` deliberadamente NO se movió de 1.0 para no romper `calculate.test.ts`
+(que ya asumía esa ancla desde el rediseño anterior).
+
+**Nuevo: botón "Cargar plantilla estándar"** en `TenantConfigForm.tsx` — sin
+esto, un tenant nuevo tendría que tipear 28 filas de zona a mano (más
+técnicas/especialización/calidad/horarios) para tener un punto de partida
+razonable. El botón carga `PLANTILLA_ESTANDAR` (nuevo export de
+`client/src/pricing/fixtures.ts`, mismos valores que `EJEMPLO_CONFIG` del
+server) completo, preservando `nombre`/`moneda` si el tenant ya los había
+tipeado. Pensado como el flujo esperado para cualquier tenant nuevo, no solo
+para pruebas internas.
+
+**Límite conocido y aceptado**: la vista 3D (`clasificarZona` en
+`preview3d/types.ts`) sigue clasificando solo en 3 baldes gruesos
+(torso/brazo/pierna) — no tiene ni tendrá por ahora una zona por cada una de
+estas 28 entradas de precio. Son dos sistemas distintos a propósito: el
+preview 3D es una ayuda visual aproximada, no valida ni deriva la zona
+elegida en el formulario de precio. Llevar el 3D a la misma granularidad
+requeriría detectar regiones anatómicas reales sobre la malla (grupos de
+vértices con nombre, no heurística de altura/X), un esfuerzo bastante mayor
+que no se justifica todavía.
+
+Verificado en navegador real con Playwright: el select de zona del cliente
+muestra las 28 etiquetas legibles (no slugs crudos), cotizar con "Esternón"
+(multiplicador 1.55) da el precio esperado calculado a mano, y "Cargar
+plantilla estándar" en un tenant nuevo completa las 28 filas de zona (más
+el resto de categorías) de un click, guardable sin errores.
+
 ## Vista 3D (v2 — investigada, no iniciada)
 
 Modelo humano 3D con peso y altura ajustables, sobre el que se superpone el

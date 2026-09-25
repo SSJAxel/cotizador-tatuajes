@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { QuoteForm } from "./pricing/QuoteForm";
 import { TenantConfigForm } from "./pricing/TenantConfigForm";
+import { Preview3D } from "./preview3d/Preview3D";
 import "./App.css";
 
+type Vista = "cliente" | "tatuador" | "vista3d";
+
 function App() {
-  const [vista, setVista] = useState<"cliente" | "tatuador">("cliente");
+  const [vista, setVista] = useState<Vista>("cliente");
 
   return (
     <div>
@@ -23,9 +26,18 @@ function App() {
         >
           Configuración (tatuador)
         </button>
+        <button
+          type="button"
+          className={vista === "vista3d" ? "activo" : ""}
+          onClick={() => setVista("vista3d")}
+        >
+          Vista 3D (beta)
+        </button>
       </nav>
 
-      {vista === "cliente" ? <QuoteForm /> : <TenantConfigForm />}
+      {vista === "cliente" && <QuoteForm />}
+      {vista === "tatuador" && <TenantConfigForm />}
+      {vista === "vista3d" && <Preview3D />}
     </div>
   );
 }

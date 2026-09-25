@@ -170,6 +170,40 @@ UN cuerpo fijo de MakeHuman + solo drag/rotate/scale del diseño sobre 2-3
 zonas. Si engancha a tatuadores reales, recién ahí se justifica la capa
 paramétrica.
 
+### Mock v1 implementado (2026-09-24)
+
+En vez de exportar un cuerpo desde MakeHuman (dependencia externa evitada a
+propósito para esta primera validación), el cuerpo fijo se armó con
+primitivas de Three.js (cápsulas para torso/brazos/piernas + esfera para la
+cabeza) — visualmente esquemático, pero suficiente para probar la mecánica
+de interacción antes de invertir en un modelo realista.
+
+- `client/src/preview3d/` — `HumanoidBody.tsx` (geometría del cuerpo, 5
+  partes: torso, 2 brazos, 2 piernas, cada una con su propia malla),
+  `Preview3D.tsx` (escena de React Three Fiber, lógica de drag/rotate/scale,
+  panel lateral con los controles), `types.ts` (nombres de parte/zona).
+- Interacción: click+arrastre sobre cualquier parte del cuerpo reposiciona
+  el diseño ahí (raycasting manual contra las 5 mallas, no el sistema de
+  eventos por-mesh de React Three Fiber, para que el arrastre no se corte al
+  salir del contorno proyectado de la malla en pantalla). Sliders aparte
+  para rotación (0-360°, roll sobre la normal de la superficie) y tamaño.
+  El decal usa `@react-three/drei`'s `<Decal>`, que orienta automáticamente
+  el diseño a la normal más cercana del punto elegido.
+- Zonas: torso, brazo (izquierdo o derecho), pierna (izquierda o derecha) —
+  cualquiera de las 5 mallas es un target de drag válido, el label de "zona
+  actual" en el panel se deriva de en cuál cayó el último click.
+- Nueva pestaña "Vista 3D (beta)" en `App.tsx`, tercera opción del switch
+  existente (antes solo Cotizador/Configuración).
+- Probado en navegador real con Playwright (instalado y desinstalado
+  temporalmente, mismo patrón que el resto del proyecto): subir imagen,
+  arrastrar sobre el torso, rotar, escalar, arrastrar a una pierna — sin
+  errores de consola propios.
+- Limitación conocida y esperada del mock: sigue sin peso/altura ajustable
+  (es exactamente lo que este v1 barato buscaba evitar hasta validar que la
+  idea engancha). El decal en las cápsulas de brazo/pierna se distorsiona
+  más notoriamente que en el torso por el radio más chico — mismo gotcha de
+  curvas fuertes ya anticipado en la investigación técnica de arriba.
+
 ## Investigación de competencia
 
 - **Cotizadores de precio genéricos ya existen**: Tattoo Studio Pro,
@@ -328,6 +362,10 @@ navegador real (Playwright):
    tenant, ver "Estado actual" arriba. Pendiente real que queda de esto:
    no hay recuperación de contraseña ni cambio de contraseña todavía (si
    alguien la pierde, hoy no hay forma de recuperar el tenant).
-2. Validar el v1 con tatuadores reales.
-3. Recién después, mock de la vista 3D (cuerpo fijo + decal en 2-3 zonas)
-   para validar el "wow feature" antes de invertir en peso/altura ajustable.
+2. ~~Mock de la vista 3D~~ — resuelto (2026-09-24), ver detalle arriba.
+   Pendiente real que queda: no está conectado a `QuoteForm.tsx` (vive como
+   pestaña aparte, no como parte del flujo de cotización real), y el diseño
+   subido no persiste ni viaja a la cotización.
+3. Validar el v1 (motor de precio + este mock 3D) con LusiTattoo en uso
+   real — recién con esa señal decidir si se invierte en la capa
+   paramétrica de peso/altura o en integrar el 3D al flujo de cotización.

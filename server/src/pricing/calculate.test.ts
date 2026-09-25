@@ -8,35 +8,54 @@ const baseInput: QuoteInput = {
   zona: "brazo",
   tecnica: "lineas_finas",
   especializacion: "cualquiera_del_estudio",
-  cantidadAgujas: 1,
   calidadProducto: "estandar",
   horario: "horario_habitual",
 };
 
 describe("calcularCotizacion", () => {
-  it("calcula el caso base sumando el insumo de tintas de la técnica", () => {
+  it("calcula el caso base: horas × tarifa horaria", () => {
     const resultado = calcularCotizacion(EJEMPLO_CONFIG, baseInput);
-    // base 10cm * 8000 = 80000, + costoInsumoTintas de lineas_finas (1500)
-    expect(resultado.precioEstimado).toBe(81500);
+    // horas = 10cm / 4cm-por-hora = 2.5h (brazo y líneas finas no ajustan)
+    // precio = 2.5h * 25000/h = 62500
+    expect(resultado.desglose.horasEstimadas).toBe(2.5);
+    expect(resultado.precioEstimado).toBe(62500);
   });
 
-  it("aplica multiplicadores de técnica y especialización", () => {
+  it("la especialización ajusta la tarifa efectiva, no un subtotal por tamaño", () => {
     const resultado = calcularCotizacion(EJEMPLO_CONFIG, {
       ...baseInput,
       tecnica: "realismo",
       especializacion: "soy_el_unico",
     });
-    // base 80000 * 1.4 (realismo) * 1.5 (unico) = 168000, + insumo tintas realismo (6000)
-    expect(resultado.precioEstimado).toBe(174000);
+    // horas = 2.5h * 1.6 (realismo) = 4h
+    // tarifa efectiva = 25000 * 1.7 (soy_el_unico) = 42500
+    // precio = 4h * 42500 = 170000
+    expect(resultado.desglose.horasEstimadas).toBe(4);
+    expect(resultado.desglose.tarifaEfectiva).toBe(42500);
+    expect(resultado.precioEstimado).toBe(170000);
   });
 
-  it("suma el extra de agujas por encima de lo incluido", () => {
+  it("redondea las horas estimadas hacia arriba en pasos de media hora", () => {
+    const resultado = calcularCotizacion(EJEMPLO_CONFIG, { ...baseInput, tamanoCm: 11 });
+    // horas = 11/4 = 2.75 -> redondea a 3
+    expect(resultado.desglose.horasEstimadas).toBe(3);
+    expect(resultado.precioEstimado).toBe(75000);
+  });
+
+  it("aplica el mínimo de estudio como piso cuando el trabajo es muy chico", () => {
+    const resultado = calcularCotizacion(EJEMPLO_CONFIG, { ...baseInput, tamanoCm: 1 });
+    // horas = 1/4 = 0.25 -> redondea a 0.5 -> 0.5 * 25000 = 12500, pero el
+    // mínimo de estudio (15000) es mayor y gana.
+    expect(resultado.desglose.horasEstimadas).toBe(0.5);
+    expect(resultado.precioEstimado).toBe(15000);
+  });
+
+  it("suma el extra de calidad de producto por encima del precio base", () => {
     const resultado = calcularCotizacion(EJEMPLO_CONFIG, {
       ...baseInput,
-      cantidadAgujas: 3,
+      calidadProducto: "premium",
     });
-    // base 80000 + insumo tintas 1500 + (2 agujas extra * 1500) = 84500
-    expect(resultado.precioEstimado).toBe(84500);
+    expect(resultado.precioEstimado).toBe(70500);
   });
 
   it("aplica el recargo porcentual de horario al final", () => {
@@ -44,8 +63,8 @@ describe("calcularCotizacion", () => {
       ...baseInput,
       horario: "urgente_mismo_dia",
     });
-    // (80000 + 1500) * 1.25
-    expect(resultado.precioEstimado).toBe(101875);
+    // 62500 * 1.30
+    expect(resultado.precioEstimado).toBe(81250);
   });
 
   it("rechaza zonas íntimas excluidas", () => {
@@ -54,9 +73,9 @@ describe("calcularCotizacion", () => {
     );
   });
 
-  it("rechaza una zona sin precio configurado", () => {
+  it("rechaza una zona sin dificultad configurada", () => {
     expect(() => calcularCotizacion(EJEMPLO_CONFIG, { ...baseInput, zona: "oreja" })).toThrow(
-      /No hay precio configurado/,
+      /No hay dificultad configurada/,
     );
   });
 });

@@ -20,6 +20,12 @@ function requiereNumeroNoNegativo(campo: string, valor: unknown) {
   }
 }
 
+function requiereNumeroPositivo(campo: string, valor: unknown) {
+  if (typeof valor !== "number" || Number.isNaN(valor) || valor <= 0) {
+    throw new Error(`"${campo}" tiene que ser un número mayor a 0.`);
+  }
+}
+
 function requiereTextoNoVacio(campo: string, valor: unknown) {
   if (typeof valor !== "string" || valor.trim().length === 0) {
     throw new Error(`"${campo}" no puede estar vacío.`);
@@ -31,17 +37,22 @@ export function validarConfigTenant(config: TenantPricingConfig) {
   requiereTextoNoVacio("nombre", config.nombre);
   requiereTextoNoVacio("moneda", config.moneda);
 
-  requiereListaNoVacia("precioPorCmPorZona", config.precioPorCmPorZona);
+  requiereNumeroPositivo("tarifaHoraria", config.tarifaHoraria);
+  requiereNumeroNoNegativo("minimoEstudio", config.minimoEstudio);
+  // cmPorHora es un divisor en el cálculo de horas — no puede ser 0 ni negativo.
+  requiereNumeroPositivo("cmPorHora", config.cmPorHora);
+
+  requiereListaNoVacia("dificultadPorZona", config.dificultadPorZona);
   requiereSinDuplicados(
-    "precioPorCmPorZona",
-    config.precioPorCmPorZona.map((z) => z.zona),
+    "dificultadPorZona",
+    config.dificultadPorZona.map((z) => z.zona),
   );
-  for (const z of config.precioPorCmPorZona) {
+  for (const z of config.dificultadPorZona) {
     requiereTextoNoVacio("zona", z.zona);
     if ((ZONAS_EXCLUIDAS as readonly string[]).includes(z.zona)) {
       throw new Error(`La zona "${z.zona}" no está permitida (es una zona íntima excluida).`);
     }
-    requiereNumeroNoNegativo(`precioPorCm de "${z.zona}"`, z.precioPorCm);
+    requiereNumeroNoNegativo(`multiplicador de dificultad de "${z.zona}"`, z.multiplicador);
   }
 
   requiereListaNoVacia("tecnicas", config.tecnicas);
@@ -51,8 +62,7 @@ export function validarConfigTenant(config: TenantPricingConfig) {
   );
   for (const t of config.tecnicas) {
     requiereTextoNoVacio("nombre de técnica", t.nombre);
-    requiereNumeroNoNegativo(`multiplicador de "${t.nombre}"`, t.multiplicador);
-    requiereNumeroNoNegativo(`costoInsumoTintas de "${t.nombre}"`, t.costoInsumoTintas);
+    requiereNumeroNoNegativo(`multiplicadorHoras de "${t.nombre}"`, t.multiplicadorHoras);
   }
 
   requiereListaNoVacia("especializacion", config.especializacion);
@@ -62,11 +72,8 @@ export function validarConfigTenant(config: TenantPricingConfig) {
   );
   for (const e of config.especializacion) {
     requiereTextoNoVacio("nivel de especialización", e.nivel);
-    requiereNumeroNoNegativo(`multiplicador de "${e.nivel}"`, e.multiplicador);
+    requiereNumeroNoNegativo(`multiplicadorTarifa de "${e.nivel}"`, e.multiplicadorTarifa);
   }
-
-  requiereNumeroNoNegativo("agujas.incluidas", config.agujas.incluidas);
-  requiereNumeroNoNegativo("agujas.precioPorAgujaExtra", config.agujas.precioPorAgujaExtra);
 
   requiereListaNoVacia("calidadProducto", config.calidadProducto);
   requiereSinDuplicados(

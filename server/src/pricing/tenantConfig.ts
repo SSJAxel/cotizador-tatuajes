@@ -26,17 +26,18 @@ export async function cargarConfigTenant(slug: string): Promise<TenantPricingCon
   return {
     nombre: tenant.nombre,
     moneda: tenant.moneda,
-    precioPorCmPorZona: tenant.zonas.map((z) => ({ zona: z.zona, precioPorCm: z.precioPorCm })),
+    tarifaHoraria: tenant.tarifaHoraria,
+    minimoEstudio: tenant.minimoEstudio,
+    cmPorHora: tenant.cmPorHora,
+    dificultadPorZona: tenant.zonas.map((z) => ({ zona: z.zona, multiplicador: z.multiplicador })),
     tecnicas: tenant.tecnicas.map((t) => ({
       nombre: t.nombre,
-      multiplicador: t.multiplicador,
-      costoInsumoTintas: t.costoInsumoTintas,
+      multiplicadorHoras: t.multiplicadorHoras,
     })),
     especializacion: tenant.especializaciones.map((e) => ({
       nivel: e.nivel,
-      multiplicador: e.multiplicador,
+      multiplicadorTarifa: e.multiplicadorTarifa,
     })),
-    agujas: { incluidas: tenant.agujasIncluidas, precioPorAgujaExtra: tenant.agujasPrecioExtra },
     calidadProducto: tenant.calidadesProducto.map((c) => ({
       nivel: c.nivel,
       costoFijo: c.costoFijo,
@@ -61,10 +62,9 @@ export async function cargarOpcionesPublicas(slug: string): Promise<TenantPublic
   return {
     nombre: config.nombre,
     moneda: config.moneda,
-    zonas: config.precioPorCmPorZona.map((z) => z.zona),
+    zonas: config.dificultadPorZona.map((z) => z.zona),
     tecnicas: config.tecnicas.map((t) => t.nombre),
     especializacion: config.especializacion.map((e) => e.nivel),
-    agujasIncluidas: config.agujas.incluidas,
     calidadProducto: config.calidadProducto.map((c) => c.nivel),
     horarios: config.horarios.map((h) => h.franja),
   };
@@ -82,32 +82,31 @@ export async function buscarTenantParaLogin(
 
 /** Reemplaza por completo las listas de precios de un tenant ya existente. */
 async function reemplazarListasDePrecio(tenantId: string, config: TenantPricingConfig) {
-  await prisma.zonaPrecio.deleteMany({ where: { tenantId } });
+  await prisma.zonaDificultad.deleteMany({ where: { tenantId } });
   await prisma.tecnica.deleteMany({ where: { tenantId } });
   await prisma.nivelEspecializacion.deleteMany({ where: { tenantId } });
   await prisma.calidadProducto.deleteMany({ where: { tenantId } });
   await prisma.horario.deleteMany({ where: { tenantId } });
 
-  await prisma.zonaPrecio.createMany({
-    data: config.precioPorCmPorZona.map((z) => ({
+  await prisma.zonaDificultad.createMany({
+    data: config.dificultadPorZona.map((z) => ({
       tenantId,
       zona: z.zona,
-      precioPorCm: z.precioPorCm,
+      multiplicador: z.multiplicador,
     })),
   });
   await prisma.tecnica.createMany({
     data: config.tecnicas.map((t) => ({
       tenantId,
       nombre: t.nombre,
-      multiplicador: t.multiplicador,
-      costoInsumoTintas: t.costoInsumoTintas,
+      multiplicadorHoras: t.multiplicadorHoras,
     })),
   });
   await prisma.nivelEspecializacion.createMany({
     data: config.especializacion.map((e) => ({
       tenantId,
       nivel: e.nivel,
-      multiplicador: e.multiplicador,
+      multiplicadorTarifa: e.multiplicadorTarifa,
     })),
   });
   await prisma.calidadProducto.createMany({
@@ -160,8 +159,9 @@ export async function actualizarConfigTenant(
       data: {
         nombre: config.nombre,
         moneda: config.moneda,
-        agujasIncluidas: config.agujas.incluidas,
-        agujasPrecioExtra: config.agujas.precioPorAgujaExtra,
+        tarifaHoraria: config.tarifaHoraria,
+        minimoEstudio: config.minimoEstudio,
+        cmPorHora: config.cmPorHora,
       },
     });
     await reemplazarListasDePrecio(tenant.id, config);

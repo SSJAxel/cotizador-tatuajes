@@ -7,10 +7,12 @@ const PASSWORD_MIN_LARGO = 8;
 const CONFIG_VACIA: TenantPricingConfig = {
   nombre: "",
   moneda: "ARS",
-  precioPorCmPorZona: [{ zona: "", precioPorCm: 0 }],
-  tecnicas: [{ nombre: "", multiplicador: 1, costoInsumoTintas: 0 }],
-  especializacion: [{ nivel: "", multiplicador: 1 }],
-  agujas: { incluidas: 1, precioPorAgujaExtra: 0 },
+  tarifaHoraria: 0,
+  minimoEstudio: 0,
+  cmPorHora: 1,
+  dificultadPorZona: [{ zona: "", multiplicador: 1 }],
+  tecnicas: [{ nombre: "", multiplicadorHoras: 1 }],
+  especializacion: [{ nivel: "", multiplicadorTarifa: 1 }],
   calidadProducto: [{ nivel: "", costoFijo: 0 }],
   horarios: [{ franja: "", recargoPorcentual: 0 }],
 };
@@ -233,40 +235,50 @@ export function TenantConfigForm() {
           </label>
 
           <fieldset>
-            <legend>Agujas</legend>
+            <legend>Tarifa</legend>
+            <p className="disclaimer">
+              El precio se calcula en base a horas estimadas × tarifa horaria — no por
+              tamaño directo. Tamaño, zona y técnica ajustan cuántas horas lleva el
+              trabajo (ver abajo).
+            </p>
             <label>
-              Incluidas en el precio base
+              Tarifa horaria ($/hora)
               <input
                 type="number"
                 min={0}
-                value={config.agujas.incluidas}
-                onChange={(e) =>
-                  setConfig({
-                    ...config,
-                    agujas: { ...config.agujas, incluidas: Number(e.target.value) },
-                  })
-                }
+                value={config.tarifaHoraria}
+                onChange={(e) => setConfig({ ...config, tarifaHoraria: Number(e.target.value) })}
               />
             </label>
             <label>
-              Precio por aguja extra
+              Mínimo de estudio (piso de precio aunque el trabajo sea rápido)
               <input
                 type="number"
                 min={0}
-                value={config.agujas.precioPorAgujaExtra}
-                onChange={(e) =>
-                  setConfig({
-                    ...config,
-                    agujas: { ...config.agujas, precioPorAgujaExtra: Number(e.target.value) },
-                  })
-                }
+                value={config.minimoEstudio}
+                onChange={(e) => setConfig({ ...config, minimoEstudio: Number(e.target.value) })}
+              />
+            </label>
+            <label>
+              Cm por hora (velocidad base: cuánto cubrís por hora en una zona/técnica sin
+              dificultad extra)
+              <input
+                type="number"
+                min={0.1}
+                step="any"
+                value={config.cmPorHora}
+                onChange={(e) => setConfig({ ...config, cmPorHora: Number(e.target.value) })}
               />
             </label>
           </fieldset>
 
           <fieldset>
-            <legend>Precio por zona del cuerpo (por cm)</legend>
-            {config.precioPorCmPorZona.map((z, i) => (
+            <legend>Dificultad por zona del cuerpo</legend>
+            <p className="disclaimer">
+              Multiplicador sobre las horas estimadas. 1 = velocidad base, mayor a 1 =
+              zona más lenta/difícil (curvas, movimiento de piel), menor a 1 = más rápida.
+            </p>
+            {config.dificultadPorZona.map((z, i) => (
               <div className="fila-lista" key={i}>
                 <input
                   placeholder="zona (ej. brazo)"
@@ -274,7 +286,7 @@ export function TenantConfigForm() {
                   onChange={(e) =>
                     setConfig({
                       ...config,
-                      precioPorCmPorZona: actualizarEnLista(config.precioPorCmPorZona, i, {
+                      dificultadPorZona: actualizarEnLista(config.dificultadPorZona, i, {
                         zona: e.target.value,
                       }),
                     })
@@ -283,13 +295,14 @@ export function TenantConfigForm() {
                 <input
                   type="number"
                   min={0}
-                  placeholder="precio por cm"
-                  value={z.precioPorCm}
+                  step="any"
+                  placeholder="multiplicador (ej. 1.0)"
+                  value={z.multiplicador}
                   onChange={(e) =>
                     setConfig({
                       ...config,
-                      precioPorCmPorZona: actualizarEnLista(config.precioPorCmPorZona, i, {
-                        precioPorCm: Number(e.target.value),
+                      dificultadPorZona: actualizarEnLista(config.dificultadPorZona, i, {
+                        multiplicador: Number(e.target.value),
                       }),
                     })
                   }
@@ -299,7 +312,7 @@ export function TenantConfigForm() {
                   onClick={() =>
                     setConfig({
                       ...config,
-                      precioPorCmPorZona: config.precioPorCmPorZona.filter((_, j) => j !== i),
+                      dificultadPorZona: config.dificultadPorZona.filter((_, j) => j !== i),
                     })
                   }
                 >
@@ -312,7 +325,7 @@ export function TenantConfigForm() {
               onClick={() =>
                 setConfig({
                   ...config,
-                  precioPorCmPorZona: [...config.precioPorCmPorZona, { zona: "", precioPorCm: 0 }],
+                  dificultadPorZona: [...config.dificultadPorZona, { zona: "", multiplicador: 1 }],
                 })
               }
             >
@@ -322,6 +335,10 @@ export function TenantConfigForm() {
 
           <fieldset>
             <legend>Técnicas</legend>
+            <p className="disclaimer">
+              Multiplicador sobre las horas estimadas. Mayor a 1 = técnica con más
+              detalle/sombreado/color, lleva más horas para el mismo tamaño.
+            </p>
             {config.tecnicas.map((t, i) => (
               <div className="fila-lista" key={i}>
                 <input
@@ -337,28 +354,14 @@ export function TenantConfigForm() {
                 <input
                   type="number"
                   min={0}
-                  step={0.1}
-                  placeholder="multiplicador"
-                  value={t.multiplicador}
+                  step="any"
+                  placeholder="multiplicador de horas (ej. 1.0)"
+                  value={t.multiplicadorHoras}
                   onChange={(e) =>
                     setConfig({
                       ...config,
                       tecnicas: actualizarEnLista(config.tecnicas, i, {
-                        multiplicador: Number(e.target.value),
-                      }),
-                    })
-                  }
-                />
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="costo insumo tintas"
-                  value={t.costoInsumoTintas}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      tecnicas: actualizarEnLista(config.tecnicas, i, {
-                        costoInsumoTintas: Number(e.target.value),
+                        multiplicadorHoras: Number(e.target.value),
                       }),
                     })
                   }
@@ -378,10 +381,7 @@ export function TenantConfigForm() {
               onClick={() =>
                 setConfig({
                   ...config,
-                  tecnicas: [
-                    ...config.tecnicas,
-                    { nombre: "", multiplicador: 1, costoInsumoTintas: 0 },
-                  ],
+                  tecnicas: [...config.tecnicas, { nombre: "", multiplicadorHoras: 1 }],
                 })
               }
             >
@@ -391,6 +391,10 @@ export function TenantConfigForm() {
 
           <fieldset>
             <legend>Niveles de especialización</legend>
+            <p className="disclaimer">
+              Multiplicador sobre tu tarifa horaria (no sobre el precio final) — un
+              nivel más solicitado/único cobra más por hora, no un extra fijo.
+            </p>
             {config.especializacion.map((esp, i) => (
               <div className="fila-lista" key={i}>
                 <input
@@ -408,14 +412,14 @@ export function TenantConfigForm() {
                 <input
                   type="number"
                   min={0}
-                  step={0.1}
-                  placeholder="multiplicador"
-                  value={esp.multiplicador}
+                  step="any"
+                  placeholder="multiplicador de tarifa (ej. 1.0)"
+                  value={esp.multiplicadorTarifa}
                   onChange={(e) =>
                     setConfig({
                       ...config,
                       especializacion: actualizarEnLista(config.especializacion, i, {
-                        multiplicador: Number(e.target.value),
+                        multiplicadorTarifa: Number(e.target.value),
                       }),
                     })
                   }
@@ -438,7 +442,10 @@ export function TenantConfigForm() {
               onClick={() =>
                 setConfig({
                   ...config,
-                  especializacion: [...config.especializacion, { nivel: "", multiplicador: 1 }],
+                  especializacion: [
+                    ...config.especializacion,
+                    { nivel: "", multiplicadorTarifa: 1 },
+                  ],
                 })
               }
             >

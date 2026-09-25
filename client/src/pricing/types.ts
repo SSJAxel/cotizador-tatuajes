@@ -1,15 +1,20 @@
 // Duplicado a mano del server (server/src/pricing/types.ts) hasta que el
 // proyecto tenga un paquete compartido cliente/servidor.
 
+/**
+ * Modelo de precio basado en TIEMPO, no en tamaño (ver investigación de
+ * mercado 2026-09-24 en el README del server). Tamaño, zona y técnica
+ * ajustan la ESTIMACIÓN DE HORAS; la especialización ajusta la TARIFA.
+ */
 export interface TenantPricingConfig {
   nombre: string;
   moneda: string;
-  precioPorCmPorZona: { zona: string; precioPorCm: number }[];
-  // costoInsumoTintas: cuánto sale en tintas hacer esta técnica — el cliente
-  // no elige cantidad de tintas, se deriva de la técnica que pidió.
-  tecnicas: { nombre: string; multiplicador: number; costoInsumoTintas: number }[];
-  especializacion: { nivel: string; multiplicador: number }[];
-  agujas: { incluidas: number; precioPorAgujaExtra: number };
+  tarifaHoraria: number;
+  minimoEstudio: number;
+  cmPorHora: number;
+  dificultadPorZona: { zona: string; multiplicador: number }[];
+  tecnicas: { nombre: string; multiplicadorHoras: number }[];
+  especializacion: { nivel: string; multiplicadorTarifa: number }[];
   calidadProducto: { nivel: string; costoFijo: number }[];
   horarios: { franja: string; recargoPorcentual: number }[];
 }
@@ -25,7 +30,6 @@ export interface TenantPublicOptions {
   zonas: string[];
   tecnicas: string[];
   especializacion: string[];
-  agujasIncluidas: number;
   calidadProducto: string[];
   horarios: string[];
 }
@@ -36,7 +40,6 @@ export interface QuoteInput {
   zona: string;
   tecnica: string;
   especializacion: string;
-  cantidadAgujas: number;
   calidadProducto: string;
   horario: string;
 }
@@ -48,14 +51,14 @@ export interface AuthResponse {
 export interface QuoteResult {
   precioEstimado: number;
   desglose: {
-    base: number;
-    multTecnica: number;
+    horasEstimadas: number;
+    tarifaHoraria: number;
     multEspecializacion: number;
-    subtotal: number;
-    costoInsumoTintas: number;
-    extraAgujas: number;
+    tarifaEfectiva: number;
+    minimoEstudio: number;
+    precioBase: number;
     costoCalidadProducto: number;
-    extras: number;
+    precioConExtras: number;
     recargoPorcentual: number;
     precioFinal: number;
   };

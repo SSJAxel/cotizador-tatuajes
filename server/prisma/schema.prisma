@@ -10,51 +10,57 @@ datasource db {
 // Un tenant = un tatuador/estudio. Las zonas íntimas excluidas
 // (pene, ano, paladar, esclerótica) NO viven acá — son una constante
 // hardcodeada en la app (ver src/pricing/types.ts), no configurable.
+//
+// Modelo de precio basado en TIEMPO (tarifaHoraria × horas estimadas), no en
+// tamaño — ver investigación de mercado 2026-09-24 en el README.
 model Tenant {
-  id                String   @id @default(cuid())
-  slug              String   @unique
-  nombre            String
-  moneda            String   @default("ARS")
-  agujasIncluidas   Int      @default(1)
-  agujasPrecioExtra Float    @default(0)
-  passwordHash      String
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  nombre        String
+  moneda        String   @default("ARS")
+  tarifaHoraria Float    @default(0)
+  minimoEstudio Float    @default(0)
+  cmPorHora     Float    @default(1)
+  passwordHash  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  zonas             ZonaPrecio[]
+  zonas             ZonaDificultad[]
   tecnicas          Tecnica[]
   especializaciones NivelEspecializacion[]
   calidadesProducto CalidadProducto[]
   horarios          Horario[]
 }
 
-model ZonaPrecio {
-  id          String @id @default(cuid())
-  tenantId    String
-  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  zona        String
-  precioPorCm Float
+/** multiplicador >1 = zona más lenta/difícil de tatuar; <1 = más rápida. */
+model ZonaDificultad {
+  id            String @id @default(cuid())
+  tenantId      String
+  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  zona          String
+  multiplicador Float
 
   @@unique([tenantId, zona])
 }
 
+/** multiplicadorHoras >1 = técnica que lleva más horas para el mismo tamaño. */
 model Tecnica {
   id                String @id @default(cuid())
   tenantId          String
   tenant            Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nombre            String
-  multiplicador     Float
-  costoInsumoTintas Float
+  multiplicadorHoras Float
 
   @@unique([tenantId, nombre])
 }
 
+/** multiplicadorTarifa ajusta la tarifa horaria, no un subtotal por tamaño. */
 model NivelEspecializacion {
-  id            String @id @default(cuid())
-  tenantId      String
-  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  nivel         String
-  multiplicador Float
+  id                String @id @default(cuid())
+  tenantId          String
+  tenant            Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  nivel             String
+  multiplicadorTarifa Float
 
   @@unique([tenantId, nivel])
 }

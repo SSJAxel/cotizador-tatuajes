@@ -31,7 +31,6 @@ export function QuoteForm() {
           zona: cfg.zonas[0],
           tecnica: cfg.tecnicas[0],
           especializacion: cfg.especializacion[0],
-          cantidadAgujas: cfg.agujasIncluidas,
           calidadProducto: cfg.calidadProducto[0],
           horario: cfg.horarios[0],
         });
@@ -155,17 +154,6 @@ export function QuoteForm() {
             </label>
 
             <label>
-              Cantidad de agujas
-              <input
-                type="number"
-                min={0}
-                value={input.cantidadAgujas}
-                onChange={(e) => actualizar("cantidadAgujas", Number(e.target.value))}
-                required
-              />
-            </label>
-
-            <label>
               Calidad de producto
               <select
                 value={input.calidadProducto}
@@ -213,32 +201,33 @@ export function QuoteForm() {
                 <summary>Ver desglose</summary>
                 <ul>
                   <li>
-                    <span>Base (tamaño × zona)</span>
-                    <span>{resultado.desglose.base}</span>
+                    <span>Horas estimadas</span>
+                    <span>{resultado.desglose.horasEstimadas} h</span>
                   </li>
                   <li>
-                    <span>Multiplicador técnica</span>
-                    <span>×{resultado.desglose.multTecnica}</span>
+                    <span>Tarifa horaria</span>
+                    <span>
+                      {config.moneda} {resultado.desglose.tarifaHoraria.toLocaleString("es-AR")}/h
+                    </span>
                   </li>
                   <li>
                     <span>Multiplicador especialización</span>
                     <span>×{resultado.desglose.multEspecializacion}</span>
                   </li>
                   <li>
-                    <span>Subtotal</span>
-                    <span>{resultado.desglose.subtotal}</span>
+                    <span>Tarifa efectiva</span>
+                    <span>
+                      {config.moneda} {resultado.desglose.tarifaEfectiva.toLocaleString("es-AR")}/h
+                    </span>
                   </li>
                   <li>
-                    <span>Insumo de tintas (según técnica)</span>
-                    <span>{resultado.desglose.costoInsumoTintas}</span>
-                  </li>
-                  <li>
-                    <span>Extra agujas</span>
-                    <span>{resultado.desglose.extraAgujas}</span>
+                    <span>Precio base (horas × tarifa, mínimo {config.moneda}{" "}
+                      {resultado.desglose.minimoEstudio.toLocaleString("es-AR")})</span>
+                    <span>{resultado.desglose.precioBase.toLocaleString("es-AR")}</span>
                   </li>
                   <li>
                     <span>Calidad de producto</span>
-                    <span>{resultado.desglose.costoCalidadProducto}</span>
+                    <span>{resultado.desglose.costoCalidadProducto.toLocaleString("es-AR")}</span>
                   </li>
                   <li>
                     <span>Recargo horario</span>

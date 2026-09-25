@@ -22,7 +22,15 @@ Verticalizar precio funciona mejor con marca y posicionamiento propios
 de turnos. Cross-sell/integración liviana con booking-saas (API o embed)
 queda como opción futura, sin fusionar backend ni facturación.
 
-## Motor de precio (v1 — en definición)
+## Motor de precio (v1 — en definición, SUPERADO 2026-09-25)
+
+> **Esta sección quedó superada.** El modelo de abajo (precio por cm, cantidad
+> de tintas/agujas como variables de cotización) resultó estar construido
+> sobre un supuesto que la industria misma considera un error de principiante
+> — ver "Rediseño del motor de precio (2026-09-25)" más abajo para el modelo
+> vigente (horas estimadas × tarifa horaria). Se deja esta sección como
+> registro histórico de cómo se llegó hasta acá, no como referencia de
+> implementación actual.
 
 Precio **aproximado** en base a variables configurables por tatuador. El
 precio final puede o no variar respecto al estimado (queda a criterio del
@@ -134,6 +142,131 @@ QuoteInput {
   horario: string
 }
 ```
+
+## Rediseño del motor de precio (2026-09-25): horas × tarifa, no por tamaño
+
+El usuario frenó el trabajo de cargar la config real de LusiTattoo con una
+observación de fondo: el modelo de arriba (precio por cm) no refleja cómo
+cotizan los tatuadores de verdad. Investigación de mercado antes de tocar
+código.
+
+### Cómo cotizan los tatuadores en la práctica
+
+- **La unidad real es el TIEMPO, no el tamaño.** Casi ningún tatuador serio
+  cobra por cm² — varias fuentes lo marcan explícitamente como el error más
+  común de quien recién arranca en el negocio. La lógica real:
+  `precio = tarifa_horaria × horas_estimadas`, con un **mínimo de estudio**
+  (shop minimum) como piso aunque el trabajo sea de 15 minutos.
+- **Por qué "por cm" está mal**: dos tatuajes del mismo tamaño pueden costar
+  muy distinto. Ejemplo real citado en la investigación: una pieza de letras
+  simples de 5" ronda USD 200, y un diseño botánico con sombreado fino y 3
+  colores del mismo tamaño ronda USD 500 — más del doble, mismo tamaño. Lo
+  que cambia el precio es la **densidad de detalle/complejidad**, que
+  determina cuántas horas lleva — el tamaño es un input de esa estimación,
+  no la variable directa de precio.
+- **La tarifa horaria ya incluye reputación/demanda/experiencia.** Un
+  tatuador muy solicitado no aplica un multiplicador sobre una base
+  compartida — directamente cobra más por hora. Rangos reales 2026: artistas
+  nuevos USD 100-150/h, mid-career USD 150-250/h, top artists USD 250-400+/h.
+- **Cantidad de tintas y cantidad de agujas no aparecen en ninguna fuente**
+  como variables que el cliente ve o que mueven el precio — son costo de
+  insumos del artista (marginal, ya diluido en la tarifa horaria), no un
+  ítem de cotización. Esto invalida dos de las 10 "variables diferenciadoras"
+  originales del proyecto (ver sección superada arriba).
+- **Zona del cuerpo importa por dificultad/tiempo** (curvas, movimiento de la
+  piel) **y por dolor** (que puede forzar sesiones más cortas → más
+  sesiones) — no por un precio fijo por cm de esa zona.
+- **Piezas grandes se cobran por sesión** (medio día / día completo, ej.
+  USD 600-800 la sesión de ~4h), no extendiendo linealmente un cálculo por
+  cm. Señas de USD 100-300+ aplicadas al total son práctica estándar
+  (confirmado también en Argentina).
+- **Argentina**: mismo patrón — los tatuadores calculan horas de trabajo →
+  costo; con la inflación de insumos algunos ya migraron a cobrar "por
+  sesión" directamente porque el costo por cm dejó de tener sentido.
+
+### Modelo vigente
+
+```
+horas_estimadas  = (tamaño_cm / cm_por_hora) × dificultad[zona] × mult_horas[técnica]
+                    // redondeado hacia arriba en pasos de media hora
+tarifa_efectiva  = tarifa_horaria × mult_tarifa[especialización]
+precio_base      = max(mínimo_estudio, tarifa_efectiva × horas_estimadas)
+precio_con_extras = precio_base + costo_fijo[calidad_producto]
+precio_final     = precio_con_extras × (1 + recargo_%[horario])
+```
+
+Diferencias clave respecto al modelo superado:
+
+- **Tamaño, zona y técnica ya no fijan un precio** — ajustan la ESTIMACIÓN DE
+  HORAS. Zona pesa por dificultad (curvas/movimiento, no por precio de
+  venta); técnica pesa por densidad de detalle/sombreado/color.
+- **Especialización multiplica la TARIFA, no un subtotal** — un nivel más
+  solicitado/único cobra más por hora, coherente con cómo funciona en la
+  realidad (no es un extra fijo bolted-on).
+- **Mínimo de estudio nuevo**: piso de precio real que no existía antes.
+- **Cantidad de tintas y cantidad de agujas se sacaron por completo** como
+  variables de cotización — ni el cliente las elige ni el tatuador las
+  configura acá. `TenantConfigForm` y `QuoteForm` ya no tienen esos campos.
+- **Calidad de producto se mantuvo** como único extra fijo opcional — es un
+  upsell real (ej. tinta premium/vegana), no un costo de insumo disfrazado.
+- Redondeo de horas a pasos de media hora (`Math.ceil(horas*2)/2`) porque los
+  estudios bloquean turnos en franjas de media hora, no minutos exactos.
+
+### Modelo de datos vigente
+
+```
+TenantPricingConfig {
+  nombre: string
+  moneda: string
+  tarifaHoraria: number        // $/hora base del estudio
+  minimoEstudio: number        // piso de precio (shop minimum)
+  cmPorHora: number            // velocidad de referencia, no un precio
+  dificultadPorZona: [ { zona: string, multiplicador: number } ]   // >1 = más lento/difícil
+  tecnicas:          [ { nombre: string, multiplicadorHoras: number } ]  // >1 = más horas
+  especializacion:   [ { nivel: string, multiplicadorTarifa: number } ]  // multiplica la tarifa
+  calidadProducto:   [ { nivel: string, costoFijo: number } ]      // extra opcional real
+  horarios:          [ { franja: string, recargoPorcentual: number } ]
+}
+
+QuoteInput {   // lo completa el CLIENTE — ya no incluye cantidadAgujas
+  tamanoCm: number
+  zona: string
+  tecnica: string
+  especializacion: string
+  calidadProducto: string
+  horario: string
+}
+```
+
+Implementado en `server/src/pricing/{types,calculate,validateConfig,tenantConfig}.ts`,
+`server/prisma/schema.prisma` (modelo `ZonaDificultad` reemplaza a
+`ZonaPrecio`, se sacaron las columnas de agujas de `Tenant`), y espejado a
+mano en `client/src/pricing/types.ts` + los formularios (`QuoteForm.tsx`,
+`TenantConfigForm.tsx`). 8 tests de `calculate.test.ts` cubren el caso base,
+el ajuste de especialización sobre la tarifa (no el subtotal), el redondeo
+de horas, el piso de mínimo de estudio, el extra de calidad, el recargo de
+horario y el rechazo de zonas inválidas.
+
+**Gotcha encontrado al probar el formulario de configuración con números
+reales** (no enteros redondos): los inputs de multiplicador tenían
+`step={0.1}` o `step={0.05}` — un valor como `1.15` con `step={0.1}` viola la
+validación HTML5 nativa (`1.15` no es múltiplo exacto de `0.1`) y el
+navegador bloquea el submit **sin ningún error visible ni request de red**,
+nada en consola. Se cambiaron todos los inputs de multiplicador/tarifa a
+`step="any"`. El bug no se había notado antes porque los valores de ejemplo
+originales (1.0, 1.1, 1.4, 1.3) coincidían por casualidad con múltiplos
+limpios de 0.1.
+
+**Verificado de punta a punta en navegador real con Playwright** (instalado
+y desinstalado temporalmente, mismo patrón de siempre): cotización del
+tenant `demo` con la fórmula nueva (10cm, brazo, líneas finas → 2.5h → ARS
+62.500, coincide con el cálculo a mano), y el flujo completo de onboarding
+de un tenant nuevo (`lusitattoo`) desde cero por la pantalla de
+autoconfiguración: crear cuenta → completar las 6 categorías → guardar →
+cerrar sesión → volver a entrar → los datos persistieron. Confirmado también
+por API que `lusitattoo` cotiza igual que `demo` con los mismos inputs
+(mismo estándar de números, ver Vault para el detalle de por qué se usó el
+mismo estándar para ambos tenants).
 
 ## Vista 3D (v2 — investigada, no iniciada)
 
@@ -301,11 +434,13 @@ Postgres + Prisma. **Local y separado del Postgres de booking-saas**
 propio en la raíz).
 
 - `server/prisma/schema.prisma` — un modelo `Tenant` con relaciones 1-N a
-  `ZonaPrecio`, `Tecnica`, `NivelEspecializacion`, `CalidadProducto` y
+  `ZonaDificultad`, `Tecnica`, `NivelEspecializacion`, `CalidadProducto` y
   `Horario` (cada uno = una fila de las listas de `TenantPricingConfig`).
-  `agujasIncluidas`/`agujasPrecioExtra` viven como columnas planas en
-  `Tenant` (es un único objeto, no una lista). Las zonas íntimas excluidas
-  siguen hardcodeadas en código (`ZONAS_EXCLUIDAS`), no en la DB.
+  `tarifaHoraria`/`minimoEstudio`/`cmPorHora` viven como columnas planas en
+  `Tenant` (son un único valor, no una lista) — ver "Rediseño del motor de
+  precio" más abajo, reemplazaron a `agujasIncluidas`/`agujasPrecioExtra`
+  (2026-09-25). Las zonas íntimas excluidas siguen hardcodeadas en código
+  (`ZONAS_EXCLUIDAS`), no en la DB.
 - `server/prisma/seed.ts` — crea un tenant `demo` con los mismos valores
   que antes vivían en `fixtures.ts`.
 - **Nota de Prisma**: se usa la v6.19.3, no la v7 (última estable). Prisma
@@ -426,7 +561,18 @@ navegador real (Playwright):
    servidor ni ser compartible entre dispositivos — decisión explícita del
    usuario para mantener el alcance chico (no hay todavía concepto de
    "pedido"/turno guardado en este proyecto, es puramente un cotizador).
-5. Validar el v1 (motor de precio + vista 3D embebida) con LusiTattoo en
+5. ~~Motor de precio grounded en cómo cotiza la industria realmente~~ —
+   resuelto (2026-09-25), ver "Rediseño del motor de precio" arriba.
+6. Tenant `lusitattoo` creado (2026-09-25) con un **estándar de números
+   acordado entre usuario y asistente** (no los precios reales de
+   LusiTattoo todavía — ver Vault para la distinción). Sirvió también para
+   probar de punta a punta la experiencia de autoconfiguración de un tenant
+   nuevo, que encontró y corrigió el bug de `step` de los inputs numéricos
+   (ver arriba).
+7. Reemplazar los números de `lusitattoo` por su tarifa horaria, mínimo de
+   estudio y dificultades/técnicas reales — pendiente, requiere que ella (o
+   el usuario en su nombre) los defina.
+8. Validar el v1 (motor de precio + vista 3D embebida) con LusiTattoo en
    uso real — recién con esa señal decidir si se invierte en la capa
    paramétrica de peso/altura, en persistencia real del lado del servidor
    (con link compartible), o en reposar el modelo (hoy en T-pose).

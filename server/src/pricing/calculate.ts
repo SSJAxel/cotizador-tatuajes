@@ -1,23 +1,30 @@
 import { ZONAS_EXCLUIDAS, type TenantPricingConfig, type QuoteInput, type QuoteResult } from "./types.js";
 
+/** Los estudios bloquean turnos en franjas de media hora, no minutos exactos. */
+function redondearHorasArribaAMedia(horas: number): number {
+  return Math.ceil(horas * 2) / 2;
+}
+
 export function calcularCotizacion(config: TenantPricingConfig, input: QuoteInput): QuoteResult {
   if ((ZONAS_EXCLUIDAS as readonly string[]).includes(input.zona)) {
     throw new Error(`La zona "${input.zona}" no está permitida.`);
   }
 
-  const zonaConfig = config.precioPorCmPorZona.find((z) => z.zona === input.zona);
+  const zonaConfig = config.dificultadPorZona.find((z) => z.zona === input.zona);
   if (!zonaConfig) {
-    throw new Error(`No hay precio configurado para la zona "${input.zona}".`);
+    throw new Error(`No hay dificultad configurada para la zona "${input.zona}".`);
   }
 
   const tecnicaConfig = config.tecnicas.find((t) => t.nombre === input.tecnica);
   if (!tecnicaConfig) {
-    throw new Error(`No hay multiplicador configurado para la técnica "${input.tecnica}".`);
+    throw new Error(`No hay técnica configurada "${input.tecnica}".`);
   }
 
-  const especializacionConfig = config.especializacion.find((e) => e.nivel === input.especializacion);
+  const especializacionConfig = config.especializacion.find(
+    (e) => e.nivel === input.especializacion,
+  );
   if (!especializacionConfig) {
-    throw new Error(`No hay multiplicador configurado para la especialización "${input.especializacion}".`);
+    throw new Error(`No hay nivel de especialización configurado "${input.especializacion}".`);
   }
 
   const calidadConfig = config.calidadProducto.find((c) => c.nivel === input.calidadProducto);
@@ -30,27 +37,32 @@ export function calcularCotizacion(config: TenantPricingConfig, input: QuoteInpu
     throw new Error(`No hay recargo configurado para el horario "${input.horario}".`);
   }
 
-  const base = input.tamanoCm * zonaConfig.precioPorCm;
-  const subtotal = base * tecnicaConfig.multiplicador * especializacionConfig.multiplicador;
+  // Tamaño, zona y técnica ajustan cuántas HORAS lleva el trabajo — no un
+  // precio directo. La zona pesa por dificultad/curvas, la técnica por
+  // densidad de detalle/sombreado/color (ver README, investigación 2026-09-24).
+  const horasBase = input.tamanoCm / config.cmPorHora;
+  const horasEstimadas = redondearHorasArribaAMedia(
+    horasBase * zonaConfig.multiplicador * tecnicaConfig.multiplicadorHoras,
+  );
 
-  const agujasExtra = Math.max(0, input.cantidadAgujas - config.agujas.incluidas);
-  const extraAgujas = agujasExtra * config.agujas.precioPorAgujaExtra;
-
-  const extras = tecnicaConfig.costoInsumoTintas + extraAgujas + calidadConfig.costoFijo;
-
-  const precioFinal = (subtotal + extras) * (1 + horarioConfig.recargoPorcentual / 100);
+  // La especialización ajusta la TARIFA (un artista más solicitado cobra
+  // más por hora), no un multiplicador sobre un subtotal compartido.
+  const tarifaEfectiva = config.tarifaHoraria * especializacionConfig.multiplicadorTarifa;
+  const precioBase = Math.max(config.minimoEstudio, tarifaEfectiva * horasEstimadas);
+  const precioConExtras = precioBase + calidadConfig.costoFijo;
+  const precioFinal = precioConExtras * (1 + horarioConfig.recargoPorcentual / 100);
 
   return {
     precioEstimado: Math.round(precioFinal * 100) / 100,
     desglose: {
-      base,
-      multTecnica: tecnicaConfig.multiplicador,
-      multEspecializacion: especializacionConfig.multiplicador,
-      subtotal,
-      costoInsumoTintas: tecnicaConfig.costoInsumoTintas,
-      extraAgujas,
+      horasEstimadas,
+      tarifaHoraria: config.tarifaHoraria,
+      multEspecializacion: especializacionConfig.multiplicadorTarifa,
+      tarifaEfectiva,
+      minimoEstudio: config.minimoEstudio,
+      precioBase: Math.round(precioBase * 100) / 100,
       costoCalidadProducto: calidadConfig.costoFijo,
-      extras,
+      precioConExtras: Math.round(precioConExtras * 100) / 100,
       recargoPorcentual: horarioConfig.recargoPorcentual,
       precioFinal: Math.round(precioFinal * 100) / 100,
     },

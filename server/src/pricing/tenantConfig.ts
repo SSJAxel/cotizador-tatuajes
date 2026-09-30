@@ -74,6 +74,71 @@ export async function buscarTenantParaLogin(
   });
 }
 
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
+
+/**
+ * Crea un token de reset para el tenant si tiene email cargado. Devuelve
+ * `null` si el tenant no existe o no tiene email — el llamador (ruta HTTP)
+ * responde igual en ambos casos para no filtrar cuáles slugs existen.
+ */
+export async function crearTokenResetPassword(
+  slug: string,
+  tokenHash: string,
+): Promise<{ email: string } | null> {
+  const tenant = await prisma.tenant.findUnique({
+    where: { slug },
+    select: { id: true, email: true },
+  });
+  if (!tenant?.email) return null;
+
+  await prisma.passwordResetToken.create({
+    data: {
+      tenantId: tenant.id,
+      tokenHash,
+      expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+    },
+  });
+
+  return { email: tenant.email };
+}
+
+/**
+ * Valida el token (existe, no vencido, no usado) y si es válido actualiza
+ * la contraseña del tenant dueño y marca el token como usado, todo en una
+ * transacción. Devuelve `false` si el token no es válido por cualquier motivo.
+ */
+export async function resetearPasswordConToken(
+  tokenHash: string,
+  passwordHashNueva: string,
+): Promise<boolean> {
+  const token = await prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+
+  if (!token || token.usedAt || token.expiresAt < new Date()) {
+    return false;
+  }
+
+  await prisma.$transaction([
+    prisma.tenant.update({
+      where: { id: token.tenantId },
+      data: { passwordHash: passwordHashNueva },
+    }),
+    prisma.passwordResetToken.update({
+      where: { id: token.id },
+      data: { usedAt: new Date() },
+    }),
+  ]);
+
+  return true;
+}
+
+/** Cambia email y/o contraseña de un tenant ya autenticado (sesión activa). */
+export async function actualizarCuentaTenant(
+  slug: string,
+  cambios: { email?: string; passwordHash?: string },
+): Promise<void> {
+  await prisma.tenant.update({ where: { slug }, data: cambios });
+}
+
 /** Reemplaza por completo las listas de precios de un tenant ya existente. */
 async function reemplazarListasDePrecio(tenantId: string, config: TenantPricingConfig) {
   await prisma.zonaDificultad.deleteMany({ where: { tenantId } });

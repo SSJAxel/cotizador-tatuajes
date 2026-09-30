@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { randomBytes, createHash } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
@@ -33,6 +34,22 @@ function verificarToken(token: string): { slug: string } | null {
   } catch {
     return null;
   }
+}
+
+const RESET_TOKEN_BYTES = 32;
+
+/**
+ * Genera el token de reset que viaja en el link del mail (crudo, nunca se
+ * guarda así) junto con su hash sha256 (lo que sí se guarda en la DB, para
+ * poder invalidar/comparar sin dejar el token en texto plano en la base).
+ */
+export function generarTokenReset(): { tokenCrudo: string; tokenHash: string } {
+  const tokenCrudo = randomBytes(RESET_TOKEN_BYTES).toString("hex");
+  return { tokenCrudo, tokenHash: hashearTokenReset(tokenCrudo) };
+}
+
+export function hashearTokenReset(tokenCrudo: string): string {
+  return createHash("sha256").update(tokenCrudo).digest("hex");
 }
 
 /**

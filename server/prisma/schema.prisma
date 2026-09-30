@@ -17,6 +17,7 @@ model Tenant {
   id            String   @id @default(cuid())
   slug          String   @unique
   nombre        String
+  email         String?
   moneda        String   @default("ARS")
   tarifaHoraria Float    @default(0)
   minimoEstudio Float    @default(0)
@@ -25,10 +26,28 @@ model Tenant {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  zonas             ZonaDificultad[]
-  tecnicas          Tecnica[]
-  calidadesProducto CalidadProducto[]
-  horarios          Horario[]
+  zonas              ZonaDificultad[]
+  tecnicas           Tecnica[]
+  calidadesProducto  CalidadProducto[]
+  horarios           Horario[]
+  resetTokens        PasswordResetToken[]
+}
+
+/**
+ * Token de un solo uso para el flujo de "olvidé mi contraseña". Se guarda el
+ * hash (sha256) del token, nunca el valor crudo — el valor crudo solo viaja
+ * por el link del mail. `usedAt` evita reusar el mismo token dos veces.
+ */
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId])
 }
 
 /** multiplicador >1 = zona más lenta/difícil de tatuar; <1 = más rápida. */

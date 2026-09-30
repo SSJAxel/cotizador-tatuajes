@@ -21,7 +21,7 @@ function actualizarEnLista<T>(lista: T[], index: number, cambios: Partial<T>): T
   return lista.map((item, i) => (i === index ? { ...item, ...cambios } : item));
 }
 
-type Modo = "elegir_slug" | "registro" | "login" | "editar";
+type Modo = "elegir_slug" | "registro" | "login" | "olvido" | "editar";
 
 export function TenantConfigForm() {
   const [slug, setSlug] = useState("demo");
@@ -32,6 +32,14 @@ export function TenantConfigForm() {
   const [mensaje, setMensaje] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+
+  const [emailCuenta, setEmailCuenta] = useState("");
+  const [passwordActual, setPasswordActual] = useState("");
+  const [passwordNueva, setPasswordNueva] = useState("");
+  const [passwordNuevaConfirmar, setPasswordNuevaConfirmar] = useState("");
+  const [mensajeCuenta, setMensajeCuenta] = useState<string | null>(null);
+  const [errorCuenta, setErrorCuenta] = useState<string | null>(null);
+  const [cargandoCuenta, setCargandoCuenta] = useState(false);
 
   // Paso 1: el slug NO es secreto (el formulario público ya lo expone vía
   // /options), así que usamos esa misma llamada sin auth solo para decidir
@@ -136,6 +144,83 @@ export function TenantConfigForm() {
     setPassword("");
     setMensaje(null);
     setError(null);
+    setEmailCuenta("");
+    setPasswordActual("");
+    setPasswordNueva("");
+    setPasswordNuevaConfirmar("");
+    setMensajeCuenta(null);
+    setErrorCuenta(null);
+  }
+
+  async function pedirRecuperacion() {
+    setError(null);
+    setMensaje(null);
+    setCargando(true);
+    try {
+      const res = await fetch(`${API_URL}/tenants/${slug}/forgot-password`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "No se pudo pedir la recuperación.");
+      setMensaje(data.mensaje as string);
+    } catch {
+      setError("No se pudo conectar con el servidor. ¿Está corriendo en " + API_URL + "?");
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  async function guardarEmail(e: FormEvent) {
+    e.preventDefault();
+    if (!token) return;
+    setErrorCuenta(null);
+    setMensajeCuenta(null);
+    setCargandoCuenta(true);
+    try {
+      const res = await fetch(`${API_URL}/tenants/${slug}/account`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email: emailCuenta }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "No se pudo guardar el email.");
+      }
+      setMensajeCuenta("Email guardado. Ahí llega el link si algún día usás 'olvidé mi contraseña'.");
+    } catch (err) {
+      setErrorCuenta((err as Error).message);
+    } finally {
+      setCargandoCuenta(false);
+    }
+  }
+
+  async function cambiarPassword(e: FormEvent) {
+    e.preventDefault();
+    if (!token) return;
+    setErrorCuenta(null);
+    setMensajeCuenta(null);
+
+    if (passwordNueva !== passwordNuevaConfirmar) {
+      setErrorCuenta("Las dos contraseñas nuevas no coinciden.");
+      return;
+    }
+
+    setCargandoCuenta(true);
+    try {
+      const res = await fetch(`${API_URL}/tenants/${slug}/account`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword: passwordActual, newPassword: passwordNueva }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "No se pudo cambiar la contraseña.");
+      setPasswordActual("");
+      setPasswordNueva("");
+      setPasswordNuevaConfirmar("");
+      setMensajeCuenta("Contraseña actualizada.");
+    } catch (err) {
+      setErrorCuenta((err as Error).message);
+    } finally {
+      setCargandoCuenta(false);
+    }
   }
 
   return (
@@ -174,7 +259,32 @@ export function TenantConfigForm() {
           <button type="button" onClick={() => setModo("elegir_slug")}>
             Volver
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setMensaje(null);
+              setModo("olvido");
+            }}
+          >
+            ¿Olvidaste tu contraseña?
+          </button>
         </form>
+      )}
+
+      {modo === "olvido" && (
+        <div>
+          <p className="disclaimer">
+            Si "{slug}" tiene un email cargado en su cuenta, le mandamos un link para elegir una
+            contraseña nueva (vence en 1 hora).
+          </p>
+          <button type="button" onClick={pedirRecuperacion} disabled={cargando}>
+            {cargando ? "Enviando..." : "Enviar link de recuperación"}
+          </button>
+          <button type="button" onClick={() => setModo("login")}>
+            Volver
+          </button>
+        </div>
       )}
 
       {modo === "registro" && (
@@ -513,6 +623,74 @@ export function TenantConfigForm() {
             {cargando ? "Guardando..." : "Guardar"}
           </button>
         </form>
+      )}
+
+      {modo === "editar" && config && (
+        <>
+          <form onSubmit={guardarEmail}>
+            <fieldset>
+              <legend>Cuenta</legend>
+              <p className="disclaimer">
+                Cargá un email para poder usar "¿Olvidaste tu contraseña?" si alguna vez la
+                perdés. Sin email cargado, ese link no tiene a dónde mandarse.
+              </p>
+              <label>
+                Email
+                <input
+                  type="email"
+                  placeholder="tu@email.com"
+                  value={emailCuenta}
+                  onChange={(e) => setEmailCuenta(e.target.value)}
+                  required
+                />
+              </label>
+              <button type="submit" disabled={cargandoCuenta}>
+                {cargandoCuenta ? "Guardando..." : "Guardar email"}
+              </button>
+            </fieldset>
+          </form>
+
+          <form onSubmit={cambiarPassword}>
+            <fieldset>
+              <legend>Cambiar contraseña</legend>
+              <label>
+                Contraseña actual
+                <input
+                  type="password"
+                  value={passwordActual}
+                  onChange={(e) => setPasswordActual(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                Contraseña nueva (mínimo {PASSWORD_MIN_LARGO} caracteres)
+                <input
+                  type="password"
+                  value={passwordNueva}
+                  onChange={(e) => setPasswordNueva(e.target.value)}
+                  minLength={PASSWORD_MIN_LARGO}
+                  required
+                />
+              </label>
+              <label>
+                Confirmar contraseña nueva
+                <input
+                  type="password"
+                  value={passwordNuevaConfirmar}
+                  onChange={(e) => setPasswordNuevaConfirmar(e.target.value)}
+                  minLength={PASSWORD_MIN_LARGO}
+                  required
+                />
+              </label>
+              <button type="submit" disabled={cargandoCuenta}>
+                {cargandoCuenta ? "Guardando..." : "Cambiar contraseña"}
+              </button>
+            </fieldset>
+          </form>
+
+          {errorCuenta && <p className="error">{errorCuenta}</p>}
+          {mensajeCuenta && <p className="mensaje">{mensajeCuenta}</p>}
+        </>
       )}
     </div>
   );

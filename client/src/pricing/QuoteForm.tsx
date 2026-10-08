@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { ETIQUETAS } from "./fixtures";
 import type { QuoteInput, QuoteResult, TenantPublicOptions } from "./types";
 import { Preview3D } from "../preview3d/Preview3D";
@@ -16,6 +16,7 @@ export function QuoteForm() {
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [mostrarVista3D, setMostrarVista3D] = useState(false);
+  const [precioAnim, setPrecioAnim] = useState(0);
 
   useEffect(() => {
     fetch(`${API_URL}/tenants/${TENANT_SLUG}/options`)
@@ -30,12 +31,54 @@ export function QuoteForm() {
           tamanoCm: 10,
           zona: cfg.zonas[0],
           tecnica: cfg.tecnicas[0],
-          calidadProducto: cfg.calidadProducto[0],
-          horario: cfg.horarios[0],
         });
       })
       .catch((err) => setConfigError((err as Error).message));
   }, []);
+
+  // Reveal al entrar en viewport. Se re-corre cuando ya hay config (el
+  // contenido real recién existe en el DOM en ese momento). Sin librerías.
+  useEffect(() => {
+    const els = document.querySelectorAll<HTMLElement>("[data-reveal]:not(.is-in)");
+    if (!("IntersectionObserver" in window) || els.length === 0) {
+      els.forEach((el) => el.classList.add("is-in"));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-in");
+            io.unobserve(entry.target);
+          }
+        }
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [config]);
+
+  // Count-up del precio: el momento clave de la herramienta merece "aparecer".
+  useEffect(() => {
+    const destino = resultado?.precioEstimado;
+    if (destino == null) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setPrecioAnim(destino);
+      return;
+    }
+    const duracion = 650;
+    const inicio = performance.now();
+    let raf = 0;
+    const tick = (ahora: number) => {
+      const p = Math.min(1, (ahora - inicio) / duracion);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setPrecioAnim(Math.round(destino * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [resultado?.precioEstimado]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -72,13 +115,20 @@ export function QuoteForm() {
   if (configError) {
     return (
       <div className="quote-page">
-        <header className="quote-header">
-          <h1>Cotizador de tatuajes</h1>
-        </header>
-        <p className="error">
-          No se pudo cargar la configuración: {configError}. ¿Está el servidor corriendo en{" "}
-          {API_URL}?
-        </p>
+        <section className="state-screen">
+          <p className="hero__eyebrow">
+            <span className="dot" />
+            Sin conexión
+          </p>
+          <h1>No pudimos cargar el cotizador.</h1>
+          <p className="state-screen__msg">{configError}</p>
+          <p className="state-screen__hint">
+            Verificá que el servidor esté corriendo en <code>{API_URL}</code>.
+          </p>
+          <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
+            Reintentar
+          </button>
+        </section>
       </div>
     );
   }
@@ -86,24 +136,84 @@ export function QuoteForm() {
   if (!config || !input) {
     return (
       <div className="quote-page">
-        <header className="quote-header">
-          <h1>Cotizador de tatuajes</h1>
-          <p className="disclaimer">Cargando...</p>
+        <header className="hero">
+          <p className="hero__eyebrow">
+            <span className="dot" />
+            Cargando
+          </p>
+          <div className="skel skel--title" />
+          <div className="skel skel--title skel--short" />
         </header>
+        <div className="section">
+          <div className="quote-grid">
+            <div className="quote-panel">
+              <div className="skel skel--field" />
+              <div className="skel skel--field" />
+              <div className="skel skel--field" />
+              <div className="skel skel--field" />
+              <div className="skel skel--button" />
+            </div>
+            <div className="quote-summary">
+              <div className="skel skel--label" />
+              <div className="skel skel--price" />
+              <div className="skel skel--line" />
+              <div className="skel skel--line" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="quote-page">
-      <header className="quote-header">
-        <span className="eyebrow">{config.nombre}</span>
-        <h1>¿Cuánto cuesta tu próximo tatuaje?</h1>
-        <p className="disclaimer">Precio aproximado — puede variar según lo evalúe el tatuador.</p>
+      <header className="hero" id="top">
+        <p className="hero__eyebrow" data-reveal>
+          <span className="dot" />
+          {config.nombre}
+        </p>
+        <h1 className="hero__title">
+          <span className="line" data-reveal>
+            ¿Cuánto cuesta
+          </span>
+          <span className="line line--accent" data-reveal style={{ "--reveal-delay": "90ms" } as CSSProperties}>
+            tu próximo tatuaje?
+          </span>
+        </h1>
+        <div className="hero__foot" data-reveal style={{ "--reveal-delay": "180ms" } as CSSProperties}>
+          <p className="hero__sub">
+            Un precio estimado en segundos. Después lo confirma el tatuador según
+            tu diseño.
+          </p>
+          <a href="#cotiza" className="hero__link">
+            Cotizar <i>↓</i>
+          </a>
+        </div>
       </header>
 
-      <div className="quote-grid">
-        <section className="quote-panel">
+      <section className="marquee" aria-hidden="true">
+        <div className="marquee__track">
+          {Array.from({ length: 2 }).flatMap((_, rep) =>
+            ["Líneas finas", "Lettering", "Realismo", "Tradicional", "Blackwork", "Color"].map(
+              (palabra) => (
+                <span key={`${rep}-${palabra}`}>
+                  {palabra}
+                  <i className="marquee__sep">✦</i>
+                </span>
+              ),
+            ),
+          )}
+        </div>
+      </section>
+
+      <section className="section" id="cotiza">
+        <div className="section__head" data-reveal>
+          <span className="section__index">(01) — Tu presupuesto</span>
+          <h2 className="section__title">Armá tu cotización</h2>
+        </div>
+
+        <div className="quote-grid">
+        <section className="quote-panel" data-reveal>
           <form className="quote-form-fields" onSubmit={onSubmit}>
             <label>
               Tamaño (cm)
@@ -138,31 +248,6 @@ export function QuoteForm() {
               </select>
             </label>
 
-            <label>
-              Calidad de producto
-              <select
-                value={input.calidadProducto}
-                onChange={(e) => actualizar("calidadProducto", e.target.value)}
-              >
-                {config.calidadProducto.map((nivel) => (
-                  <option key={nivel} value={nivel}>
-                    {ETIQUETAS[nivel] ?? nivel}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Horario del turno
-              <select value={input.horario} onChange={(e) => actualizar("horario", e.target.value)}>
-                {config.horarios.map((franja) => (
-                  <option key={franja} value={franja}>
-                    {ETIQUETAS[franja] ?? franja}
-                  </option>
-                ))}
-              </select>
-            </label>
-
             <button type="submit" className="btn-primary" disabled={cargando}>
               {cargando ? "Calculando..." : "Calcular precio"}
             </button>
@@ -175,12 +260,16 @@ export function QuoteForm() {
           )}
         </section>
 
-        <aside className="quote-summary">
+        <aside
+          className="quote-summary"
+          data-reveal
+          style={{ "--reveal-delay": "120ms" } as CSSProperties}
+        >
           {resultado ? (
-            <>
+            <div className="quote-summary-result" key={resultado.precioEstimado}>
               <span className="quote-summary-label">Precio estimado</span>
               <p className="quote-summary-price">
-                {config.moneda} {resultado.precioEstimado.toLocaleString("es-AR")}
+                {config.moneda} {precioAnim.toLocaleString("es-AR")}
               </p>
               <details className="quote-breakdown">
                 <summary>Ver desglose</summary>
@@ -196,21 +285,29 @@ export function QuoteForm() {
                     </span>
                   </li>
                   <li>
-                    <span>Precio base (horas × tarifa, mínimo {config.moneda}{" "}
-                      {resultado.desglose.minimoEstudio.toLocaleString("es-AR")})</span>
-                    <span>{resultado.desglose.precioBase.toLocaleString("es-AR")}</span>
+                    <span>Tiempo (horas × tarifa)</span>
+                    <span>
+                      {config.moneda} {resultado.desglose.costoTiempo.toLocaleString("es-AR")}
+                    </span>
                   </li>
                   <li>
-                    <span>Calidad de producto</span>
-                    <span>{resultado.desglose.costoCalidadProducto.toLocaleString("es-AR")}</span>
+                    <span>Fijo de preparación (prep + stencil)</span>
+                    <span>
+                      {config.moneda} {resultado.desglose.fijoPreparacion.toLocaleString("es-AR")}
+                    </span>
                   </li>
-                  <li>
-                    <span>Recargo horario</span>
-                    <span>{resultado.desglose.recargoPorcentual}%</span>
-                  </li>
+                  {resultado.desglose.aplicoMinimo && (
+                    <li>
+                      <span>Mínimo de estudio aplicado</span>
+                      <span>
+                        {config.moneda}{" "}
+                        {resultado.desglose.minimoEstudio.toLocaleString("es-AR")}
+                      </span>
+                    </li>
+                  )}
                 </ul>
               </details>
-            </>
+            </div>
           ) : (
             <div className="quote-summary-empty">
               <span className="quote-summary-label">Presupuesto estimado</span>
@@ -218,26 +315,34 @@ export function QuoteForm() {
             </div>
           )}
         </aside>
-      </div>
-
-      <section className="quote-3d-toggle">
-        <div>
-          <h2>¿Querés ver cómo quedaría?</h2>
-          <p className="disclaimer">
-            Subí tu diseño de referencia y probalo sobre un cuerpo en 3D antes
-            de agendar. Es una vista aproximada, no afecta el precio.
-          </p>
         </div>
-        <button
-          type="button"
-          className="btn-secondary"
-          onClick={() => setMostrarVista3D((v) => !v)}
-        >
-          {mostrarVista3D ? "Ocultar vista previa 3D" : "Mostrar vista previa 3D"}
-        </button>
       </section>
 
-      {mostrarVista3D && <Preview3D tenantSlug={TENANT_SLUG} />}
+      <section className="section" id="preview">
+        <div className="section__head" data-reveal>
+          <span className="section__index">(02) — Previsualización</span>
+          <h2 className="section__title">Mirá cómo quedaría</h2>
+        </div>
+
+        <div className="quote-3d-toggle" data-reveal>
+          <div>
+            <h3>Probalo sobre un cuerpo en 3D</h3>
+            <p className="disclaimer">
+              Subí tu diseño de referencia y probalo sobre un cuerpo en 3D antes
+              de agendar. Es una vista aproximada, no afecta el precio.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setMostrarVista3D((v) => !v)}
+          >
+            {mostrarVista3D ? "Ocultar vista previa 3D" : "Mostrar vista previa 3D"}
+          </button>
+        </div>
+
+        {mostrarVista3D && <Preview3D tenantSlug={TENANT_SLUG} />}
+      </section>
     </div>
   );
 }

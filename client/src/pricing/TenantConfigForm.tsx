@@ -1,31 +1,114 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type { AuthResponse, TenantPricingConfig } from "./types";
 import { PLANTILLA_ESTANDAR } from "./fixtures";
+import { QuizCalibracion } from "./QuizCalibracion";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
 const PASSWORD_MIN_LARGO = 8;
+
+// Sesión persistida para que F5 no deslogueé. Guardamos slug + token (el token
+// JWT vence a las 12h del lado del server igual; si está vencido, el GET
+// /config inicial devuelve 401 y limpiamos la sesión guardada).
+const STORAGE_KEY = "cotizador_sesion";
+
+function leerSesion(): { slug: string; token: string } | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { slug?: unknown; token?: unknown };
+    if (typeof parsed.slug === "string" && typeof parsed.token === "string") {
+      return { slug: parsed.slug, token: parsed.token };
+    }
+  } catch {
+    /* localStorage no disponible o JSON corrupto: tratamos como sin sesión */
+  }
+  return null;
+}
+
+function guardarSesion(slug: string, token: string) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ slug, token }));
+  } catch {
+    /* sin localStorage: la sesión simplemente no sobrevive al reload */
+  }
+}
+
+function borrarSesion() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* no-op */
+  }
+}
 
 const CONFIG_VACIA: TenantPricingConfig = {
   nombre: "",
   moneda: "ARS",
   tarifaHoraria: 0,
   minimoEstudio: 0,
+  fijoPreparacion: 0,
   cmPorHora: 1,
   dificultadPorZona: [{ zona: "", multiplicador: 1 }],
   tecnicas: [{ nombre: "", multiplicadorHoras: 1 }],
-  calidadProducto: [{ nivel: "", costoFijo: 0 }],
-  horarios: [{ franja: "", recargoPorcentual: 0 }],
 };
+
+/** Monedas soportadas por ahora. */
+const MONEDAS = ["ARS", "USD"] as const;
 
 function actualizarEnLista<T>(lista: T[], index: number, cambios: Partial<T>): T[] {
   return lista.map((item, i) => (i === index ? { ...item, ...cambios } : item));
 }
 
 type Modo = "elegir_slug" | "registro" | "login" | "olvido" | "editar";
+type Seccion = "estudio" | "estilos" | "cuenta";
+
+/** Íconos SVG inline (sin emoji) — stroke en currentColor para heredar el color del contexto. */
+function Icono({ nombre }: { nombre: Seccion }) {
+  const comun = {
+    width: 18,
+    height: 18,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  if (nombre === "estudio") {
+    return (
+      <svg {...comun} aria-hidden="true">
+        <path d="M3 9l1.5-5h15L21 9" />
+        <path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9" />
+        <path d="M3 9h18" />
+        <path d="M9 20v-6h6v6" />
+      </svg>
+    );
+  }
+  if (nombre === "estilos") {
+    return (
+      <svg {...comun} aria-hidden="true">
+        <path d="M12 3l1.9 4.6L18.5 9l-3.5 3 1 5-4-2.6L8 17l1-5-3.5-3 4.6-1.4L12 3z" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...comun} aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" />
+    </svg>
+  );
+}
+
+const SECCIONES: { id: Seccion; label: string }[] = [
+  { id: "estudio", label: "Mi estudio" },
+  { id: "estilos", label: "Estilos & tiempos" },
+  { id: "cuenta", label: "Cuenta" },
+];
 
 export function TenantConfigForm() {
   const [slug, setSlug] = useState("demo");
   const [modo, setModo] = useState<Modo>("elegir_slug");
+  const [seccion, setSeccion] = useState<Seccion>("estudio");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState<string | null>(null);
   const [config, setConfig] = useState<TenantPricingConfig | null>(null);
@@ -40,6 +123,40 @@ export function TenantConfigForm() {
   const [mensajeCuenta, setMensajeCuenta] = useState<string | null>(null);
   const [errorCuenta, setErrorCuenta] = useState<string | null>(null);
   const [cargandoCuenta, setCargandoCuenta] = useState(false);
+
+  // Si hay una sesión guardada, arrancamos "restaurando" para no mostrar el
+  // formulario de login un instante antes de recuperar la sesión real.
+  const [restaurando, setRestaurando] = useState<boolean>(() => leerSesion() !== null);
+
+  // Al montar: si hay sesión guardada, intentamos recuperar la config con ese
+  // token. Si anda, entramos directo a "editar"; si el token venció (401) o
+  // falla, limpiamos la sesión guardada y mostramos el login normal.
+  useEffect(() => {
+    const sesion = leerSesion();
+    if (!sesion) return;
+    let vivo = true;
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/tenants/${sesion.slug}/config`, {
+          headers: { Authorization: `Bearer ${sesion.token}` },
+        });
+        if (!res.ok) throw new Error("sesión inválida o vencida");
+        const dataConfig = (await res.json()) as TenantPricingConfig;
+        if (!vivo) return;
+        setSlug(sesion.slug);
+        setToken(sesion.token);
+        setConfig(dataConfig);
+        setModo("editar");
+      } catch {
+        borrarSesion();
+      } finally {
+        if (vivo) setRestaurando(false);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   // Paso 1: el slug NO es secreto (el formulario público ya lo expone vía
   // /options), así que usamos esa misma llamada sin auth solo para decidir
@@ -82,6 +199,8 @@ export function TenantConfigForm() {
       setToken(nuevoToken);
       setConfig(dataConfig as TenantPricingConfig);
       setModo("editar");
+      setSeccion("estudio");
+      guardarSesion(slug, nuevoToken);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -106,6 +225,8 @@ export function TenantConfigForm() {
       setToken(nuevoToken);
       setConfig({ ...CONFIG_VACIA });
       setModo("editar");
+      setSeccion("estudio");
+      guardarSesion(slug, nuevoToken);
       setMensaje(`Cuenta creada. Completá los datos y guardá para terminar de configurar "${slug}".`);
     } catch (err) {
       setError((err as Error).message);
@@ -138,9 +259,11 @@ export function TenantConfigForm() {
   }
 
   function cerrarSesion() {
+    borrarSesion();
     setToken(null);
     setConfig(null);
     setModo("elegir_slug");
+    setSeccion("estudio");
     setPassword("");
     setMensaje(null);
     setError(null);
@@ -223,474 +346,479 @@ export function TenantConfigForm() {
     }
   }
 
+  const esAuth = modo !== "editar";
+
+  if (restaurando) {
+    return (
+      <div className="tenant-config">
+        <p className="disclaimer">Restaurando sesión…</p>
+      </div>
+    );
+  }
+
   return (
     <div className="tenant-config">
-      <h1>Configuración del tatuador</h1>
+      <header className="config-header">
+        <p className="hero__eyebrow">
+          <span className="dot" />
+          Panel privado
+        </p>
+        <h1>Configurá tu estudio</h1>
+        <p className="config-header__sub">
+          Definí tu tarifa y calibrá tus estilos. Lo que guardes acá alimenta el
+          cotizador en tiempo real.
+        </p>
+      </header>
 
-      {modo === "elegir_slug" && (
-        <div className="slug-picker">
-          <label>
-            Slug del tenant
-            <input value={slug} onChange={(e) => setSlug(e.target.value)} />
-          </label>
-          <button type="button" onClick={buscarSlug} disabled={cargando}>
-            Continuar
-          </button>
+      {esAuth && (
+        <div className="auth-card">
+          {modo === "elegir_slug" && (
+            <div className="slug-picker">
+              <label>
+                Slug del tenant
+                <input value={slug} onChange={(e) => setSlug(e.target.value)} />
+              </label>
+              <button type="button" onClick={buscarSlug} disabled={cargando}>
+                Continuar
+              </button>
+            </div>
+          )}
+
+          {modo === "login" && (
+            <form onSubmit={loguear}>
+              <p className="disclaimer">
+                El tenant "{slug}" ya existe. Iniciá sesión para editarlo.
+              </p>
+              <label>
+                Contraseña
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </label>
+              <button type="submit" disabled={cargando}>
+                {cargando ? "Ingresando..." : "Iniciar sesión"}
+              </button>
+              <div className="auth-card__links">
+                <button type="button" onClick={() => setModo("elegir_slug")}>
+                  Volver
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setMensaje(null);
+                    setModo("olvido");
+                  }}
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
+            </form>
+          )}
+
+          {modo === "olvido" && (
+            <div>
+              <p className="disclaimer">
+                Si "{slug}" tiene un email cargado en su cuenta, le mandamos un link para elegir una
+                contraseña nueva (vence en 1 hora).
+              </p>
+              <button type="button" onClick={pedirRecuperacion} disabled={cargando}>
+                {cargando ? "Enviando..." : "Enviar link de recuperación"}
+              </button>
+              <div className="auth-card__links">
+                <button type="button" onClick={() => setModo("login")}>
+                  Volver
+                </button>
+              </div>
+            </div>
+          )}
+
+          {modo === "registro" && (
+            <form onSubmit={registrar}>
+              <p className="disclaimer">
+                El tenant "{slug}" no existe todavía — elegí una contraseña para crearlo. Vas a poder
+                cargar precios y opciones después de crearlo.
+              </p>
+              <label>
+                Contraseña (mínimo {PASSWORD_MIN_LARGO} caracteres)
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  minLength={PASSWORD_MIN_LARGO}
+                  required
+                />
+              </label>
+              <button type="submit" disabled={cargando}>
+                {cargando ? "Creando..." : "Crear tenant"}
+              </button>
+              <div className="auth-card__links">
+                <button type="button" onClick={() => setModo("elegir_slug")}>
+                  Volver
+                </button>
+              </div>
+            </form>
+          )}
+
+          {error && <p className="error">{error}</p>}
+          {mensaje && <p className="mensaje">{mensaje}</p>}
         </div>
       )}
-
-      {modo === "login" && (
-        <form onSubmit={loguear}>
-          <p className="disclaimer">
-            El tenant "{slug}" ya existe. Iniciá sesión para editarlo.
-          </p>
-          <label>
-            Contraseña
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </label>
-          <button type="submit" disabled={cargando}>
-            {cargando ? "Ingresando..." : "Iniciar sesión"}
-          </button>
-          <button type="button" onClick={() => setModo("elegir_slug")}>
-            Volver
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setError(null);
-              setMensaje(null);
-              setModo("olvido");
-            }}
-          >
-            ¿Olvidaste tu contraseña?
-          </button>
-        </form>
-      )}
-
-      {modo === "olvido" && (
-        <div>
-          <p className="disclaimer">
-            Si "{slug}" tiene un email cargado en su cuenta, le mandamos un link para elegir una
-            contraseña nueva (vence en 1 hora).
-          </p>
-          <button type="button" onClick={pedirRecuperacion} disabled={cargando}>
-            {cargando ? "Enviando..." : "Enviar link de recuperación"}
-          </button>
-          <button type="button" onClick={() => setModo("login")}>
-            Volver
-          </button>
-        </div>
-      )}
-
-      {modo === "registro" && (
-        <form onSubmit={registrar}>
-          <p className="disclaimer">
-            El tenant "{slug}" no existe todavía — elegí una contraseña para crearlo. Vas a poder
-            cargar precios y opciones después de crearlo.
-          </p>
-          <label>
-            Contraseña (mínimo {PASSWORD_MIN_LARGO} caracteres)
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={PASSWORD_MIN_LARGO}
-              required
-            />
-          </label>
-          <button type="submit" disabled={cargando}>
-            {cargando ? "Creando..." : "Crear tenant"}
-          </button>
-          <button type="button" onClick={() => setModo("elegir_slug")}>
-            Volver
-          </button>
-        </form>
-      )}
-
-      {error && <p className="error">{error}</p>}
-      {mensaje && <p className="mensaje">{mensaje}</p>}
 
       {modo === "editar" && config && (
-        <form onSubmit={guardar}>
-          <div className="slug-picker">
-            <span>
+        <div className="panel">
+          <div className="editor-bar">
+            <span className="editor-bar__slug">
+              <span className="dot" />
               Editando <strong>{slug}</strong>
             </span>
-            <button type="button" onClick={cerrarSesion}>
+            <button type="button" className="btn-secundario" onClick={cerrarSesion}>
               Cerrar sesión
             </button>
           </div>
 
-          <p className="disclaimer">
-            ¿Recién empezás a configurar? Cargá un punto de partida con 28 zonas del
-            cuerpo, técnicas y niveles ya cargados con valores de referencia — después
-            ajustá lo que quieras a tu realidad.
-          </p>
-          <button
-            type="button"
-            onClick={() =>
-              setConfig({ ...PLANTILLA_ESTANDAR, nombre: config.nombre, moneda: config.moneda })
-            }
-          >
-            Cargar plantilla estándar
-          </button>
-
-          <label>
-            Nombre del estudio
-            <input
-              value={config.nombre}
-              onChange={(e) => setConfig({ ...config, nombre: e.target.value })}
-              required
-            />
-          </label>
-
-          <label>
-            Moneda
-            <input
-              value={config.moneda}
-              onChange={(e) => setConfig({ ...config, moneda: e.target.value })}
-              required
-            />
-          </label>
-
-          <fieldset>
-            <legend>Tarifa</legend>
-            <p className="disclaimer">
-              El precio se calcula en base a horas estimadas × tarifa horaria — no por
-              tamaño directo. Tamaño, zona y técnica ajustan cuántas horas lleva el
-              trabajo (ver abajo).
-            </p>
-            <label>
-              Tarifa horaria ($/hora)
-              <input
-                type="number"
-                min={0}
-                value={config.tarifaHoraria}
-                onChange={(e) => setConfig({ ...config, tarifaHoraria: Number(e.target.value) })}
-              />
-            </label>
-            <label>
-              Mínimo de estudio (piso de precio aunque el trabajo sea rápido)
-              <input
-                type="number"
-                min={0}
-                value={config.minimoEstudio}
-                onChange={(e) => setConfig({ ...config, minimoEstudio: Number(e.target.value) })}
-              />
-            </label>
-            <label>
-              Cm por hora (velocidad base: cuánto cubrís por hora en una zona/técnica sin
-              dificultad extra)
-              <input
-                type="number"
-                min={0.1}
-                step="any"
-                value={config.cmPorHora}
-                onChange={(e) => setConfig({ ...config, cmPorHora: Number(e.target.value) })}
-              />
-            </label>
-          </fieldset>
-
-          <fieldset>
-            <legend>Dificultad por zona del cuerpo</legend>
-            <p className="disclaimer">
-              Multiplicador sobre las horas estimadas. 1 = velocidad base, mayor a 1 =
-              zona más lenta/difícil (curvas, movimiento de piel), menor a 1 = más rápida.
-            </p>
-            {config.dificultadPorZona.map((z, i) => (
-              <div className="fila-lista" key={i}>
-                <input
-                  placeholder="zona (ej. brazo)"
-                  value={z.zona}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      dificultadPorZona: actualizarEnLista(config.dificultadPorZona, i, {
-                        zona: e.target.value,
-                      }),
-                    })
-                  }
-                />
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  placeholder="multiplicador (ej. 1.0)"
-                  value={z.multiplicador}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      dificultadPorZona: actualizarEnLista(config.dificultadPorZona, i, {
-                        multiplicador: Number(e.target.value),
-                      }),
-                    })
-                  }
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setConfig({
-                      ...config,
-                      dificultadPorZona: config.dificultadPorZona.filter((_, j) => j !== i),
-                    })
-                  }
-                >
-                  Quitar
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                setConfig({
-                  ...config,
-                  dificultadPorZona: [...config.dificultadPorZona, { zona: "", multiplicador: 1 }],
-                })
-              }
-            >
-              + Agregar zona
-            </button>
-          </fieldset>
-
-          <fieldset>
-            <legend>Técnicas</legend>
-            <p className="disclaimer">
-              Multiplicador sobre las horas estimadas. Mayor a 1 = técnica con más
-              detalle/sombreado/color, lleva más horas para el mismo tamaño.
-            </p>
-            {config.tecnicas.map((t, i) => (
-              <div className="fila-lista" key={i}>
-                <input
-                  placeholder="nombre (ej. realismo)"
-                  value={t.nombre}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      tecnicas: actualizarEnLista(config.tecnicas, i, { nombre: e.target.value }),
-                    })
-                  }
-                />
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  placeholder="multiplicador de horas (ej. 1.0)"
-                  value={t.multiplicadorHoras}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      tecnicas: actualizarEnLista(config.tecnicas, i, {
-                        multiplicadorHoras: Number(e.target.value),
-                      }),
-                    })
-                  }
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setConfig({ ...config, tecnicas: config.tecnicas.filter((_, j) => j !== i) })
-                  }
-                >
-                  Quitar
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                setConfig({
-                  ...config,
-                  tecnicas: [...config.tecnicas, { nombre: "", multiplicadorHoras: 1 }],
-                })
-              }
-            >
-              + Agregar técnica
-            </button>
-          </fieldset>
-
-          <fieldset>
-            <legend>Calidad de producto</legend>
-            {config.calidadProducto.map((c, i) => (
-              <div className="fila-lista" key={i}>
-                <input
-                  placeholder="nivel (ej. premium)"
-                  value={c.nivel}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      calidadProducto: actualizarEnLista(config.calidadProducto, i, {
-                        nivel: e.target.value,
-                      }),
-                    })
-                  }
-                />
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="costo fijo"
-                  value={c.costoFijo}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      calidadProducto: actualizarEnLista(config.calidadProducto, i, {
-                        costoFijo: Number(e.target.value),
-                      }),
-                    })
-                  }
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setConfig({
-                      ...config,
-                      calidadProducto: config.calidadProducto.filter((_, j) => j !== i),
-                    })
-                  }
-                >
-                  Quitar
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                setConfig({
-                  ...config,
-                  calidadProducto: [...config.calidadProducto, { nivel: "", costoFijo: 0 }],
-                })
-              }
-            >
-              + Agregar nivel de calidad
-            </button>
-          </fieldset>
-
-          <fieldset>
-            <legend>Horarios</legend>
-            {config.horarios.map((h, i) => (
-              <div className="fila-lista" key={i}>
-                <input
-                  placeholder="franja (ej. urgente_mismo_dia)"
-                  value={h.franja}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      horarios: actualizarEnLista(config.horarios, i, { franja: e.target.value }),
-                    })
-                  }
-                />
-                <input
-                  type="number"
-                  placeholder="recargo %"
-                  value={h.recargoPorcentual}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      horarios: actualizarEnLista(config.horarios, i, {
-                        recargoPorcentual: Number(e.target.value),
-                      }),
-                    })
-                  }
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setConfig({ ...config, horarios: config.horarios.filter((_, j) => j !== i) })
-                  }
-                >
-                  Quitar
-                </button>
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={() =>
-                setConfig({
-                  ...config,
-                  horarios: [...config.horarios, { franja: "", recargoPorcentual: 0 }],
-                })
-              }
-            >
-              + Agregar horario
-            </button>
-          </fieldset>
-
-          <button type="submit" disabled={cargando}>
-            {cargando ? "Guardando..." : "Guardar"}
-          </button>
-        </form>
-      )}
-
-      {modo === "editar" && config && (
-        <>
-          <form onSubmit={guardarEmail}>
-            <fieldset>
-              <legend>Cuenta</legend>
-              <p className="disclaimer">
-                Cargá un email para poder usar "¿Olvidaste tu contraseña?" si alguna vez la
-                perdés. Sin email cargado, ese link no tiene a dónde mandarse.
-              </p>
-              <label>
-                Email
-                <input
-                  type="email"
-                  placeholder="tu@email.com"
-                  value={emailCuenta}
-                  onChange={(e) => setEmailCuenta(e.target.value)}
-                  required
-                />
-              </label>
-              <button type="submit" disabled={cargandoCuenta}>
-                {cargandoCuenta ? "Guardando..." : "Guardar email"}
+          <nav className="panel-nav" role="tablist" aria-label="Secciones del panel">
+            {SECCIONES.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                role="tab"
+                aria-selected={seccion === s.id}
+                className={seccion === s.id ? "activo" : ""}
+                onClick={() => setSeccion(s.id)}
+              >
+                <Icono nombre={s.id} />
+                {s.label}
               </button>
-            </fieldset>
-          </form>
+            ))}
+          </nav>
 
-          <form onSubmit={cambiarPassword}>
-            <fieldset>
-              <legend>Cambiar contraseña</legend>
-              <label>
-                Contraseña actual
-                <input
-                  type="password"
-                  value={passwordActual}
-                  onChange={(e) => setPasswordActual(e.target.value)}
-                  required
-                />
-              </label>
-              <label>
-                Contraseña nueva (mínimo {PASSWORD_MIN_LARGO} caracteres)
-                <input
-                  type="password"
-                  value={passwordNueva}
-                  onChange={(e) => setPasswordNueva(e.target.value)}
-                  minLength={PASSWORD_MIN_LARGO}
-                  required
-                />
-              </label>
-              <label>
-                Confirmar contraseña nueva
-                <input
-                  type="password"
-                  value={passwordNuevaConfirmar}
-                  onChange={(e) => setPasswordNuevaConfirmar(e.target.value)}
-                  minLength={PASSWORD_MIN_LARGO}
-                  required
-                />
-              </label>
-              <button type="submit" disabled={cargandoCuenta}>
-                {cargandoCuenta ? "Guardando..." : "Cambiar contraseña"}
-              </button>
-            </fieldset>
-          </form>
+          {!esAuth && error && <p className="error">{error}</p>}
+          {!esAuth && mensaje && <p className="mensaje">{mensaje}</p>}
 
-          {errorCuenta && <p className="error">{errorCuenta}</p>}
-          {mensajeCuenta && <p className="mensaje">{mensajeCuenta}</p>}
-        </>
+          {/* ---------- MI ESTUDIO ---------- */}
+          {seccion === "estudio" && (
+            <form className="config-editor" onSubmit={guardar}>
+              <section className="card">
+                <h2 className="card__title">Identidad</h2>
+                <div className="field-grid">
+                  <label>
+                    Nombre del estudio
+                    <input
+                      value={config.nombre}
+                      onChange={(e) => setConfig({ ...config, nombre: e.target.value })}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Moneda
+                    <select
+                      value={config.moneda}
+                      onChange={(e) => setConfig({ ...config, moneda: e.target.value })}
+                    >
+                      {MONEDAS.map((m) => (
+                        <option key={m} value={m}>
+                          {m === "ARS" ? "ARS (pesos)" : "USD (dólares)"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </section>
+
+              <section className="card">
+                <h2 className="card__title">Tarifa</h2>
+                <p className="card__hint">
+                  El precio se calcula por <strong>horas × tarifa horaria</strong>, no por tamaño.
+                  El fijo de preparación (limpieza + stencil) se suma aparte a cualquier tatuaje.
+                </p>
+                <div className="field-grid">
+                  <label>
+                    Tarifa horaria ({config.moneda}/hora)
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={config.tarifaHoraria}
+                      onChange={(e) =>
+                        setConfig({ ...config, tarifaHoraria: Number(e.target.value) })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Mínimo de estudio (piso)
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={config.minimoEstudio}
+                      onChange={(e) =>
+                        setConfig({ ...config, minimoEstudio: Number(e.target.value) })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Fijo de preparación (prep + stencil)
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={config.fijoPreparacion}
+                      onChange={(e) =>
+                        setConfig({ ...config, fijoPreparacion: Number(e.target.value) })
+                      }
+                    />
+                  </label>
+                </div>
+              </section>
+
+              <details className="avanzado">
+                <summary>
+                  Avanzado — multiplicadores por zona y técnica
+                  <span className="avanzado__nota">
+                    Opcional. El quiz de estilos los va a reemplazar; por ahora alimentan el motor viejo.
+                  </span>
+                </summary>
+
+                <div className="avanzado__body">
+                  <p className="disclaimer">
+                    ¿Recién empezás? Cargá un punto de partida con 28 zonas, técnicas y niveles ya
+                    con valores de referencia — después ajustá a tu realidad.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-secundario"
+                    onClick={() =>
+                      setConfig({
+                        ...PLANTILLA_ESTANDAR,
+                        nombre: config.nombre,
+                        moneda: config.moneda,
+                      })
+                    }
+                  >
+                    Cargar plantilla estándar
+                  </button>
+
+                  <label className="campo-suelto">
+                    Cm por hora (velocidad base)
+                    <input
+                      type="number"
+                      min={0.1}
+                      step="any"
+                      value={config.cmPorHora}
+                      onChange={(e) => setConfig({ ...config, cmPorHora: Number(e.target.value) })}
+                    />
+                  </label>
+
+                  <fieldset>
+                    <legend>Dificultad por zona del cuerpo</legend>
+                    {config.dificultadPorZona.map((z, i) => (
+                      <div className="fila-lista" key={i}>
+                        <input
+                          placeholder="zona (ej. brazo)"
+                          value={z.zona}
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              dificultadPorZona: actualizarEnLista(config.dificultadPorZona, i, {
+                                zona: e.target.value,
+                              }),
+                            })
+                          }
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          placeholder="multiplicador (ej. 1.0)"
+                          value={z.multiplicador}
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              dificultadPorZona: actualizarEnLista(config.dificultadPorZona, i, {
+                                multiplicador: Number(e.target.value),
+                              }),
+                            })
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="btn-quitar"
+                          onClick={() =>
+                            setConfig({
+                              ...config,
+                              dificultadPorZona: config.dificultadPorZona.filter((_, j) => j !== i),
+                            })
+                          }
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn-secundario"
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          dificultadPorZona: [
+                            ...config.dificultadPorZona,
+                            { zona: "", multiplicador: 1 },
+                          ],
+                        })
+                      }
+                    >
+                      + Agregar zona
+                    </button>
+                  </fieldset>
+
+                  <fieldset>
+                    <legend>Técnicas</legend>
+                    {config.tecnicas.map((t, i) => (
+                      <div className="fila-lista" key={i}>
+                        <input
+                          placeholder="nombre (ej. realismo)"
+                          value={t.nombre}
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              tecnicas: actualizarEnLista(config.tecnicas, i, {
+                                nombre: e.target.value,
+                              }),
+                            })
+                          }
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          step="any"
+                          placeholder="multiplicador de horas (ej. 1.0)"
+                          value={t.multiplicadorHoras}
+                          onChange={(e) =>
+                            setConfig({
+                              ...config,
+                              tecnicas: actualizarEnLista(config.tecnicas, i, {
+                                multiplicadorHoras: Number(e.target.value),
+                              }),
+                            })
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="btn-quitar"
+                          onClick={() =>
+                            setConfig({
+                              ...config,
+                              tecnicas: config.tecnicas.filter((_, j) => j !== i),
+                            })
+                          }
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn-secundario"
+                      onClick={() =>
+                        setConfig({
+                          ...config,
+                          tecnicas: [...config.tecnicas, { nombre: "", multiplicadorHoras: 1 }],
+                        })
+                      }
+                    >
+                      + Agregar técnica
+                    </button>
+                  </fieldset>
+
+                </div>
+              </details>
+
+              <div className="panel-guardar">
+                <button type="submit" disabled={cargando}>
+                  {cargando ? "Guardando..." : "Guardar cambios"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ---------- ESTILOS & TIEMPOS (quiz) ----------
+              Se mantiene montado (oculto con CSS) para no perder el quiz en
+              curso al cambiar de pestaña ni re-fetchear cada vez. */}
+          {token && (
+            <div style={{ display: seccion === "estilos" ? "block" : "none" }}>
+              <QuizCalibracion slug={slug} token={token} />
+            </div>
+          )}
+
+          {/* ---------- CUENTA ---------- */}
+          {seccion === "cuenta" && (
+            <div className="cuenta-seccion">
+              <form className="card" onSubmit={guardarEmail}>
+                <h2 className="card__title">Email de recuperación</h2>
+                <p className="card__hint">
+                  Cargá un email para poder usar "¿Olvidaste tu contraseña?". Sin email, ese link no
+                  tiene a dónde mandarse.
+                </p>
+                <label>
+                  Email
+                  <input
+                    type="email"
+                    placeholder="tu@email.com"
+                    value={emailCuenta}
+                    onChange={(e) => setEmailCuenta(e.target.value)}
+                    required
+                  />
+                </label>
+                <button type="submit" disabled={cargandoCuenta}>
+                  {cargandoCuenta ? "Guardando..." : "Guardar email"}
+                </button>
+              </form>
+
+              <form className="card" onSubmit={cambiarPassword}>
+                <h2 className="card__title">Cambiar contraseña</h2>
+                <label>
+                  Contraseña actual
+                  <input
+                    type="password"
+                    value={passwordActual}
+                    onChange={(e) => setPasswordActual(e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  Contraseña nueva (mínimo {PASSWORD_MIN_LARGO} caracteres)
+                  <input
+                    type="password"
+                    value={passwordNueva}
+                    onChange={(e) => setPasswordNueva(e.target.value)}
+                    minLength={PASSWORD_MIN_LARGO}
+                    required
+                  />
+                </label>
+                <label>
+                  Confirmar contraseña nueva
+                  <input
+                    type="password"
+                    value={passwordNuevaConfirmar}
+                    onChange={(e) => setPasswordNuevaConfirmar(e.target.value)}
+                    minLength={PASSWORD_MIN_LARGO}
+                    required
+                  />
+                </label>
+                <button type="submit" disabled={cargandoCuenta}>
+                  {cargandoCuenta ? "Guardando..." : "Cambiar contraseña"}
+                </button>
+              </form>
+
+              {errorCuenta && <p className="error">{errorCuenta}</p>}
+              {mensajeCuenta && <p className="mensaje">{mensajeCuenta}</p>}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

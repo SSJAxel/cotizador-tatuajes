@@ -13,11 +13,11 @@ export interface TenantPricingConfig {
   moneda: string;
   tarifaHoraria: number;
   minimoEstudio: number;
+  /** Costo fijo de arranque (preparación del estudio + colocación del stencil). */
+  fijoPreparacion: number;
   cmPorHora: number;
   dificultadPorZona: { zona: string; multiplicador: number }[];
   tecnicas: { nombre: string; multiplicadorHoras: number }[];
-  calidadProducto: { nivel: string; costoFijo: number }[];
-  horarios: { franja: string; recargoPorcentual: number }[];
 }
 
 /**
@@ -30,8 +30,6 @@ export interface TenantPublicOptions {
   moneda: string;
   zonas: string[];
   tecnicas: string[];
-  calidadProducto: string[];
-  horarios: string[];
 }
 
 /** Lo que completa el CLIENTE final en el formulario público de cotización. */
@@ -39,8 +37,6 @@ export interface QuoteInput {
   tamanoCm: number;
   zona: string;
   tecnica: string;
-  calidadProducto: string;
-  horario: string;
 }
 
 export interface AuthResponse {
@@ -52,11 +48,10 @@ export interface QuoteResult {
   desglose: {
     horasEstimadas: number;
     tarifaHoraria: number;
+    costoTiempo: number;
+    fijoPreparacion: number;
     minimoEstudio: number;
-    precioBase: number;
-    costoCalidadProducto: number;
-    precioConExtras: number;
-    recargoPorcentual: number;
+    aplicoMinimo: boolean;
     precioFinal: number;
   };
 }

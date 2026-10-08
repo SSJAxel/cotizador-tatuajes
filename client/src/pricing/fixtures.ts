@@ -33,33 +33,49 @@ export const ETIQUETAS: Record<string, string> = {
   rodilla: "Rodilla",
   esternon: "Esternón",
 
-  // Técnicas/estilos de tatuaje — ver "Rediseño del motor de precio" en el
-  // README para la investigación detrás de cada multiplicador de horas.
-  lineas_finas: "Líneas finas",
+  // ESTILOS (el look que elige el cliente) — lista real de LusiTattoo.
   lettering: "Lettering / caligrafía",
-  tribal: "Tribal",
-  tradicional_americano: "Tradicional americano",
+  neotribal: "Neotribal",
+  cybersigilism: "Cybersigilism",
+  tradicional: "Tradicional (americano / japonés)",
+  neotradicional: "Neotradicional (americano / japonés)",
   blackwork: "Blackwork",
   new_school: "New school",
-  stick_and_poke: "Stick and poke",
   chicano: "Chicano",
   blackout: "Blackout",
-  neotradicional: "Neotradicional",
+  bodysuit: "Bodysuit (proyecto de cuerpo completo)",
   trash_polka: "Trash polka",
-  acuarela: "Acuarela",
+  maori: "Maorí",
   geometrico: "Geométrico / mandala",
+  ornamental: "Ornamental",
+  realismo: "Realismo",
+  microrealismo: "Microrealismo",
+  dotwork: "Dotwork",
+
+  // TÉCNICAS (método de ejecución, donde vive el tiempo).
+  linea_hiperfina: "Línea hiperfina",
+  linea_fina: "Línea fina",
+  linea_gruesa: "Línea gruesa",
+  relleno_chico: "Relleno chico",
+  relleno_mediano: "Relleno mediano",
+  relleno_grande: "Relleno grande",
+  sombra_chica: "Sombra chica",
+  sombra_mediana: "Sombra mediana",
+  sombra_grande: "Sombra grande",
+  puntillismo_arrastre: "Puntillismo de arrastre",
+  color: "Color",
+  handpoke: "Handpoke (a mano)",
+
+  // Legacy (datos viejos de tenants anteriores al rediseño estilo/técnica):
+  lineas_finas: "Líneas finas",
+  tribal: "Tribal",
+  tradicional_americano: "Tradicional americano",
+  stick_and_poke: "Stick and poke",
+  acuarela: "Acuarela",
   japones: "Japonés (irezumi)",
-  realismo: "Realismo (blanco y negro)",
   aguja_unica: "Aguja única (single needle)",
   puntillismo: "Puntillismo (dotwork)",
   realismo_color: "Realismo a color",
-
-  // Calidad, horarios
-  estandar: "Estándar",
-  premium: "Premium",
-  horario_habitual: "Horario habitual",
-  fuera_de_horario: "Fuera de horario",
-  urgente_mismo_dia: "Urgente / mismo día",
 };
 
 /**
@@ -75,6 +91,7 @@ export const PLANTILLA_ESTANDAR: TenantPricingConfig = {
   moneda: "ARS",
   tarifaHoraria: 25000,
   minimoEstudio: 15000,
+  fijoPreparacion: 5000,
   cmPorHora: 4,
   dificultadPorZona: [
     { zona: "espalda_alta", multiplicador: 0.85 },
@@ -128,14 +145,5 @@ export const PLANTILLA_ESTANDAR: TenantPricingConfig = {
     { nombre: "aguja_unica", multiplicadorHoras: 1.7 },
     { nombre: "puntillismo", multiplicadorHoras: 1.75 },
     { nombre: "realismo_color", multiplicadorHoras: 1.85 },
-  ],
-  calidadProducto: [
-    { nivel: "estandar", costoFijo: 0 },
-    { nivel: "premium", costoFijo: 8000 },
-  ],
-  horarios: [
-    { franja: "horario_habitual", recargoPorcentual: 0 },
-    { franja: "fuera_de_horario", recargoPorcentual: 15 },
-    { franja: "urgente_mismo_dia", recargoPorcentual: 30 },
   ],
 };

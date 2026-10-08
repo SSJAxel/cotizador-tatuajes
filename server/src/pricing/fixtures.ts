@@ -11,6 +11,7 @@ export const EJEMPLO_CONFIG: TenantPricingConfig = {
   moneda: "ARS",
   tarifaHoraria: 25000,
   minimoEstudio: 15000,
+  fijoPreparacion: 5000,
   cmPorHora: 4,
   // 28 zonas (2026-09-25) en vez de 5 genéricas — ver README "Rediseño del
   // motor de precio" para la investigación detrás de cada multiplicador.
@@ -69,14 +70,5 @@ export const EJEMPLO_CONFIG: TenantPricingConfig = {
     { nombre: "aguja_unica", multiplicadorHoras: 1.7 },
     { nombre: "puntillismo", multiplicadorHoras: 1.75 },
     { nombre: "realismo_color", multiplicadorHoras: 1.85 },
-  ],
-  calidadProducto: [
-    { nivel: "estandar", costoFijo: 0 },
-    { nivel: "premium", costoFijo: 8000 },
-  ],
-  horarios: [
-    { franja: "horario_habitual", recargoPorcentual: 0 },
-    { franja: "fuera_de_horario", recargoPorcentual: 15 },
-    { franja: "urgente_mismo_dia", recargoPorcentual: 30 },
   ],
 };

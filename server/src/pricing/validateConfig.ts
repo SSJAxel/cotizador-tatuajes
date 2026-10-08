@@ -39,6 +39,7 @@ export function validarConfigTenant(config: TenantPricingConfig) {
 
   requiereNumeroPositivo("tarifaHoraria", config.tarifaHoraria);
   requiereNumeroNoNegativo("minimoEstudio", config.minimoEstudio);
+  requiereNumeroNoNegativo("fijoPreparacion", config.fijoPreparacion);
   // cmPorHora es un divisor en el cálculo de horas — no puede ser 0 ni negativo.
   requiereNumeroPositivo("cmPorHora", config.cmPorHora);
 
@@ -63,27 +64,5 @@ export function validarConfigTenant(config: TenantPricingConfig) {
   for (const t of config.tecnicas) {
     requiereTextoNoVacio("nombre de técnica", t.nombre);
     requiereNumeroNoNegativo(`multiplicadorHoras de "${t.nombre}"`, t.multiplicadorHoras);
-  }
-
-  requiereListaNoVacia("calidadProducto", config.calidadProducto);
-  requiereSinDuplicados(
-    "calidadProducto",
-    config.calidadProducto.map((c) => c.nivel),
-  );
-  for (const c of config.calidadProducto) {
-    requiereTextoNoVacio("nivel de calidad de producto", c.nivel);
-    requiereNumeroNoNegativo(`costoFijo de "${c.nivel}"`, c.costoFijo);
-  }
-
-  requiereListaNoVacia("horarios", config.horarios);
-  requiereSinDuplicados(
-    "horarios",
-    config.horarios.map((h) => h.franja),
-  );
-  for (const h of config.horarios) {
-    requiereTextoNoVacio("franja horaria", h.franja);
-    if (typeof h.recargoPorcentual !== "number" || Number.isNaN(h.recargoPorcentual)) {
-      throw new Error(`"recargoPorcentual" de "${h.franja}" tiene que ser un número.`);
-    }
   }
 }

@@ -12,6 +12,12 @@ import {
 import { enviarMailResetPassword } from "./mailer.js";
 import { calcularCotizacion } from "./pricing/calculate.js";
 import {
+  borrarCalibracionEstilo,
+  cargarCalibracion,
+  guardarCalibracionEstilo,
+  type TiempoZona,
+} from "./pricing/quizCalibracion.js";
+import {
   actualizarConfigTenant,
   actualizarCuentaTenant,
   buscarTenantParaLogin,
@@ -204,6 +210,55 @@ app.put("/tenants/:slug/config", requireAuthDeTenant, async (req, res) => {
   try {
     const guardado = await actualizarConfigTenant(req.params.slug, config);
     res.json(guardado);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+// --- Quiz de calibración por estilo (panel del tatuador, autenticado) ---
+
+// Devuelve los estilos que el tatuador ya calibró, con nivel y tiempos.
+app.get("/tenants/:slug/calibracion", requireAuthDeTenant, async (req, res) => {
+  const calibracion = await cargarCalibracion(req.params.slug);
+  if (!calibracion) {
+    res.status(404).json({ error: `No existe el tenant "${req.params.slug}".` });
+    return;
+  }
+  res.json(calibracion);
+});
+
+// Guarda (crea o reemplaza) la calibración de un estilo: nivel + minutos por zona.
+app.put("/tenants/:slug/calibracion/:estilo", requireAuthDeTenant, async (req, res) => {
+  const { nivel, tecnicas, tiempos } = req.body as {
+    nivel?: string;
+    tecnicas?: string[];
+    tiempos?: TiempoZona[];
+  };
+
+  if (!nivel || !Array.isArray(tiempos)) {
+    res.status(400).json({ error: 'Faltan "nivel" y/o "tiempos" en el body.' });
+    return;
+  }
+
+  try {
+    const guardado = await guardarCalibracionEstilo(
+      req.params.slug,
+      req.params.estilo,
+      nivel,
+      Array.isArray(tecnicas) ? tecnicas : [],
+      tiempos,
+    );
+    res.json(guardado);
+  } catch (err) {
+    res.status(400).json({ error: (err as Error).message });
+  }
+});
+
+// Quita un estilo de la calibración (el tatuador dejó de hacerlo).
+app.delete("/tenants/:slug/calibracion/:estilo", requireAuthDeTenant, async (req, res) => {
+  try {
+    await borrarCalibracionEstilo(req.params.slug, req.params.estilo);
+    res.status(204).end();
   } catch (err) {
     res.status(400).json({ error: (err as Error).message });
   }

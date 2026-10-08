@@ -15,8 +15,6 @@ export async function cargarConfigTenant(slug: string): Promise<TenantPricingCon
     include: {
       zonas: true,
       tecnicas: true,
-      calidadesProducto: true,
-      horarios: true,
     },
   });
 
@@ -27,19 +25,12 @@ export async function cargarConfigTenant(slug: string): Promise<TenantPricingCon
     moneda: tenant.moneda,
     tarifaHoraria: tenant.tarifaHoraria,
     minimoEstudio: tenant.minimoEstudio,
+    fijoPreparacion: tenant.fijoPreparacion,
     cmPorHora: tenant.cmPorHora,
     dificultadPorZona: tenant.zonas.map((z) => ({ zona: z.zona, multiplicador: z.multiplicador })),
     tecnicas: tenant.tecnicas.map((t) => ({
       nombre: t.nombre,
       multiplicadorHoras: t.multiplicadorHoras,
-    })),
-    calidadProducto: tenant.calidadesProducto.map((c) => ({
-      nivel: c.nivel,
-      costoFijo: c.costoFijo,
-    })),
-    horarios: tenant.horarios.map((h) => ({
-      franja: h.franja,
-      recargoPorcentual: h.recargoPorcentual,
     })),
   };
 }
@@ -59,8 +50,6 @@ export async function cargarOpcionesPublicas(slug: string): Promise<TenantPublic
     moneda: config.moneda,
     zonas: config.dificultadPorZona.map((z) => z.zona),
     tecnicas: config.tecnicas.map((t) => t.nombre),
-    calidadProducto: config.calidadProducto.map((c) => c.nivel),
-    horarios: config.horarios.map((h) => h.franja),
   };
 }
 
@@ -143,8 +132,6 @@ export async function actualizarCuentaTenant(
 async function reemplazarListasDePrecio(tenantId: string, config: TenantPricingConfig) {
   await prisma.zonaDificultad.deleteMany({ where: { tenantId } });
   await prisma.tecnica.deleteMany({ where: { tenantId } });
-  await prisma.calidadProducto.deleteMany({ where: { tenantId } });
-  await prisma.horario.deleteMany({ where: { tenantId } });
 
   await prisma.zonaDificultad.createMany({
     data: config.dificultadPorZona.map((z) => ({
@@ -158,20 +145,6 @@ async function reemplazarListasDePrecio(tenantId: string, config: TenantPricingC
       tenantId,
       nombre: t.nombre,
       multiplicadorHoras: t.multiplicadorHoras,
-    })),
-  });
-  await prisma.calidadProducto.createMany({
-    data: config.calidadProducto.map((c) => ({
-      tenantId,
-      nivel: c.nivel,
-      costoFijo: c.costoFijo,
-    })),
-  });
-  await prisma.horario.createMany({
-    data: config.horarios.map((h) => ({
-      tenantId,
-      franja: h.franja,
-      recargoPorcentual: h.recargoPorcentual,
     })),
   });
 }
@@ -212,6 +185,7 @@ export async function actualizarConfigTenant(
         moneda: config.moneda,
         tarifaHoraria: config.tarifaHoraria,
         minimoEstudio: config.minimoEstudio,
+        fijoPreparacion: config.fijoPreparacion,
         cmPorHora: config.cmPorHora,
       },
     });

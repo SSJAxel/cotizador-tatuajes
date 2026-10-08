@@ -20,16 +20,6 @@ export function calcularCotizacion(config: TenantPricingConfig, input: QuoteInpu
     throw new Error(`No hay técnica configurada "${input.tecnica}".`);
   }
 
-  const calidadConfig = config.calidadProducto.find((c) => c.nivel === input.calidadProducto);
-  if (!calidadConfig) {
-    throw new Error(`No hay costo configurado para la calidad de producto "${input.calidadProducto}".`);
-  }
-
-  const horarioConfig = config.horarios.find((h) => h.franja === input.horario);
-  if (!horarioConfig) {
-    throw new Error(`No hay recargo configurado para el horario "${input.horario}".`);
-  }
-
   // Tamaño, zona y técnica ajustan cuántas HORAS lleva el trabajo — no un
   // precio directo. La zona pesa por dificultad/curvas, la técnica por
   // densidad de detalle/sombreado/color (ver README, investigación 2026-09-24).
@@ -39,21 +29,22 @@ export function calcularCotizacion(config: TenantPricingConfig, input: QuoteInpu
   );
 
   // La tarifa horaria ya refleja reputación/experiencia del tatuador — sin
-  // multiplicador aparte de "especialización" (sacado 2026-09-25).
-  const precioBase = Math.max(config.minimoEstudio, config.tarifaHoraria * horasEstimadas);
-  const precioConExtras = precioBase + calidadConfig.costoFijo;
-  const precioFinal = precioConExtras * (1 + horarioConfig.recargoPorcentual / 100);
+  // multiplicador aparte de "especialización" (sacado 2026-09-25). El fijo de
+  // preparación (limpieza + stencil) se suma aparte del tiempo variable.
+  const costoTiempo = config.tarifaHoraria * horasEstimadas;
+  const subtotal = costoTiempo + config.fijoPreparacion;
+  // El mínimo de estudio es un PISO DURO: el cliente nunca ve menos que esto.
+  const precioFinal = Math.max(config.minimoEstudio, subtotal);
 
   return {
     precioEstimado: Math.round(precioFinal * 100) / 100,
     desglose: {
       horasEstimadas,
       tarifaHoraria: config.tarifaHoraria,
+      costoTiempo: Math.round(costoTiempo * 100) / 100,
+      fijoPreparacion: config.fijoPreparacion,
       minimoEstudio: config.minimoEstudio,
-      precioBase: Math.round(precioBase * 100) / 100,
-      costoCalidadProducto: calidadConfig.costoFijo,
-      precioConExtras: Math.round(precioConExtras * 100) / 100,
-      recargoPorcentual: horarioConfig.recargoPorcentual,
+      aplicoMinimo: precioFinal > subtotal,
       precioFinal: Math.round(precioFinal * 100) / 100,
     },
   };

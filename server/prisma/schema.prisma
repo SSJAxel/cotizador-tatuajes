@@ -22,6 +22,11 @@ model Tenant {
   tarifaHoraria Float    @default(0)
   minimoEstudio Float    @default(0)
   cmPorHora     Float    @default(1)
+  // Costo fijo de arranque de CUALQUIER tatuaje (preparación del estudio +
+  // colocación del stencil). Separado del tiempo variable del diseño a
+  // propósito: el quiz de calibración mide el tiempo de tatuaje PURO (sin
+  // prep ni stencil), y esto se suma aparte. Ver EstiloTenant.
+  fijoPreparacion Float  @default(0)
   passwordHash  String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -31,6 +36,47 @@ model Tenant {
   calidadesProducto  CalidadProducto[]
   horarios           Horario[]
   resetTokens        PasswordResetToken[]
+  estilos            EstiloTenant[]
+}
+
+/**
+ * Calibración por estilo del quiz visual: por cada estilo que el tatuador
+ * hace, su NIVEL con ese estilo y cuánto tiempo le lleva en distintas zonas.
+ * Esto reemplaza (a futuro) los multiplicadores genéricos de técnica/zona por
+ * la realidad medida de CADA artista: su realismo puede ser lento y su línea
+ * fina rapidísima, aunque otro tatuador sea al revés.
+ */
+model EstiloTenant {
+  id        String @id @default(cuid())
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  estilo    String // slug del estilo (el "look" que elige el cliente)
+  nivel     String // "sabe" | "practicando" | "se_anima" — su relación con ese estilo
+  // Técnicas (método de ejecución) que combina este estilo — ej. lettering =
+  // ["linea_fina", "puntillismo_arrastre"]. Slugs de TECNICAS_VALIDAS.
+  tecnicas  String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tiempos TiempoEstiloZona[]
+
+  @@unique([tenantId, estilo])
+}
+
+/**
+ * Respuesta del quiz: minutos de tatuaje PURO (sin preparación ni stencil)
+ * que le lleva al tatuador un diseño de referencia de ese estilo en esa
+ * zona. Se pregunta un set acotado de zonas (ver QUIZ_ZONAS en el client);
+ * el resto de las zonas se interpola por nivel de dolor/dificultad.
+ */
+model TiempoEstiloZona {
+  id             String @id @default(cuid())
+  estiloTenantId String
+  estiloTenant   EstiloTenant @relation(fields: [estiloTenantId], references: [id], onDelete: Cascade)
+  zona           String
+  minutos        Int
+
+  @@unique([estiloTenantId, zona])
 }
 
 /**

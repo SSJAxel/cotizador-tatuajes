@@ -21,15 +21,18 @@ export interface TenantPricingConfig {
   tarifaHoraria: number;
   /** Piso de precio aunque el trabajo sea muy rápido (shop minimum). */
   minimoEstudio: number;
+  /**
+   * Costo fijo de arranque de CUALQUIER tatuaje: preparación del estudio +
+   * colocación del stencil. Se suma aparte del tiempo variable del diseño —
+   * el quiz de calibración mide tiempo de tatuaje PURO (sin prep ni stencil).
+   */
+  fijoPreparacion: number;
   /** Cuántos cm cubre el tatuador por hora a dificultad/técnica base (referencia de velocidad, no un precio). */
   cmPorHora: number;
   /** >1 = zona más lenta/difícil de tatuar (curvas, movimiento de piel); <1 = más rápida. */
   dificultadPorZona: { zona: string; multiplicador: number }[];
   /** >1 = técnica que lleva más horas para el mismo tamaño (más detalle/sombreado/color). */
   tecnicas: { nombre: string; multiplicadorHoras: number }[];
-  /** Extra fijo opcional real (ej. tinta premium/vegana) — no confundir con costo de insumos regulares. */
-  calidadProducto: { nivel: string; costoFijo: number }[];
-  horarios: { franja: string; recargoPorcentual: number }[];
 }
 
 /**
@@ -42,17 +45,17 @@ export interface TenantPublicOptions {
   moneda: string;
   zonas: string[];
   tecnicas: string[];
-  calidadProducto: string[];
-  horarios: string[];
 }
 
-/** Lo que completa el CLIENTE final en el formulario público de cotización. */
+/**
+ * Lo que completa el CLIENTE final en el formulario público de cotización.
+ * No se pregunta calidad de producto (decisión del tatuador, no del cliente)
+ * ni horario del turno (capicotizador no maneja agenda).
+ */
 export interface QuoteInput {
   tamanoCm: number;
   zona: string;
   tecnica: string;
-  calidadProducto: string;
-  horario: string;
 }
 
 export interface AuthResponse {
@@ -64,11 +67,11 @@ export interface QuoteResult {
   desglose: {
     horasEstimadas: number;
     tarifaHoraria: number;
+    costoTiempo: number;
+    fijoPreparacion: number;
     minimoEstudio: number;
-    precioBase: number;
-    costoCalidadProducto: number;
-    precioConExtras: number;
-    recargoPorcentual: number;
+    /** true si el precio quedó "pisado" por el mínimo de estudio. */
+    aplicoMinimo: boolean;
     precioFinal: number;
   };
 }

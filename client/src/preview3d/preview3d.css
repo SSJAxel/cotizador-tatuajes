@@ -23,10 +23,12 @@
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   flex: 0 0 280px;
+  box-shadow: var(--shadow-soft);
 }
 
 .preview3d__panel h2 {
   font-size: 1.25rem;
+  letter-spacing: -0.01em;
 }
 
 .preview3d__ayuda {
@@ -58,9 +60,10 @@
   font-weight: 600;
   color: var(--color-destructive);
   background: transparent;
-  border: 1px solid rgba(248, 113, 113, 0.4);
+  border: 1px solid color-mix(in srgb, var(--accent-2) 45%, transparent);
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background 0.2s var(--ease-out);
 }
 
 .preview3d__quitar:hover {
@@ -73,6 +76,7 @@
 
 .preview3d__zona strong {
   color: var(--color-primary);
+  font-weight: 700;
 }
 
 .preview3d__campo {

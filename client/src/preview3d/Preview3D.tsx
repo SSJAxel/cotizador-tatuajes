@@ -7,7 +7,7 @@ import {
 } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
-import { Decal, OrbitControls } from "@react-three/drei";
+import { ContactShadows, Decal, OrbitControls } from "@react-three/drei";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 import { useHumanoidModel } from "./useHumanoidModel";
@@ -138,17 +138,25 @@ function Scena({
         {modelo.eyeMesh && <primitive object={modelo.eyeMesh} />}
       </group>
 
-      <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[1.2, 32]} />
-        <meshStandardMaterial color="#171939" roughness={1} />
-      </mesh>
+      <ContactShadows
+        position={[0, 0.001, 0]}
+        opacity={0.4}
+        scale={4.5}
+        blur={2.6}
+        far={2.2}
+        resolution={1024}
+        color="#2e2a1f"
+      />
 
       <OrbitControls
         ref={controlsRef}
-        target={[0, 1.1, 0]}
+        target={[0, 1.0, 0]}
+        enableDamping
+        dampingFactor={0.08}
+        enablePan={false}
         minDistance={1.3}
         maxDistance={4}
-        maxPolarAngle={Math.PI * 0.85}
+        maxPolarAngle={Math.PI * 0.9}
       />
     </>
   );
@@ -298,10 +306,31 @@ export function Preview3D({ tenantSlug = "default" }: Preview3DProps) {
       </aside>
 
       <div className="preview3d__canvas">
-        <Canvas shadows camera={{ position: [0, 1.2, 2.6], fov: 40 }}>
-          <color attach="background" args={["#0f172a"]} />
-          <ambientLight intensity={0.6} />
-          <directionalLight position={[2, 3, 2]} intensity={1.1} castShadow />
+        <Canvas
+          shadows
+          dpr={[1, 2]}
+          gl={{
+            antialias: true,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1.05,
+          }}
+          camera={{ position: [0, 1.15, 2.8], fov: 38 }}
+        >
+          <color attach="background" args={["#eeeae0"]} />
+          {/* Luz de relleno ambiental cielo/suelo — da el tono cálido del maniquí */}
+          <hemisphereLight args={["#fffaf0", "#d6cfbe", 0.75]} />
+          {/* Key: luz principal con sombra */}
+          <directionalLight
+            position={[3.5, 5, 4]}
+            intensity={2.4}
+            castShadow
+            shadow-mapSize={[2048, 2048]}
+            shadow-bias={-0.0004}
+          />
+          {/* Fill: suaviza las sombras del lado opuesto */}
+          <directionalLight position={[-4, 2.5, 2]} intensity={0.45} />
+          {/* Rim: recorta la silueta del cuerpo contra el fondo */}
+          <directionalLight position={[0, 3, -4.5]} intensity={0.9} />
           {modelo && (
             <Scena
               modelo={modelo}

@@ -56,6 +56,26 @@ export function useHumanoidModel() {
 
         skinMesh.castShadow = true;
         skinMesh.receiveShadow = true;
+        // Normales por vértice promediadas: suaviza el sombreado facetado de la
+        // malla low-poly (se ve escultural en vez de poligonal).
+        skinMesh.geometry.computeVertexNormals();
+
+        // Material "maniquí de yeso": mate, cálido-neutro, escultural. Reemplaza
+        // el DefaultSkin plano del MTL — calza con la estética clara editorial y
+        // hace que el tatuaje (decal) resalte sobre una superficie limpia.
+        skinMesh.material = new THREE.MeshStandardMaterial({
+          color: new THREE.Color("#ece5d8"),
+          roughness: 0.92,
+          metalness: 0,
+        });
+        if (eyeMesh) {
+          eyeMesh.castShadow = true;
+          eyeMesh.material = new THREE.MeshStandardMaterial({
+            color: new THREE.Color("#cdc5b4"),
+            roughness: 0.9,
+            metalness: 0,
+          });
+        }
 
         setModelo({
           skinMesh,

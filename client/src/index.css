@@ -1,25 +1,48 @@
 :root {
-  --color-primary: #7c3aed;
-  --color-primary-hover: #6d28d9;
-  --color-on-primary: #ffffff;
-  --color-accent: #22c55e;
-  --color-accent-hover: #16a34a;
-  --color-on-accent: #06210f;
-  --color-background: #0f172a;
-  --color-surface: #171939;
-  --color-surface-raised: #1e2147;
-  --color-foreground: #f4f2fb;
-  --color-muted-foreground: #a5a3c4;
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-strong: rgba(255, 255, 255, 0.16);
-  --color-destructive: #f87171;
-  --color-destructive-bg: rgba(248, 113, 113, 0.12);
-  --color-success: #4ade80;
-  --color-success-bg: rgba(74, 222, 128, 0.12);
-  --color-ring: #7c3aed;
+  /* ============================================================
+     Estética "capibyte / edolus" — tema claro editorial.
+     Papel cálido (no blanco) + acento eléctrico + secundario
+     cálido. Misma familia visual que el portfolio para que el
+     cotizador se sienta parte del mismo mundo.
+     ============================================================ */
 
-  --font-heading: "Syne", system-ui, sans-serif;
-  --font-body: "Manrope", system-ui, sans-serif;
+  --paper: #eeeae0; /* fondo base, claro pero no blanco */
+  --paper-raised: #f4f1ea; /* tarjetas / superficies elevadas */
+  --ink: #15140f; /* texto casi-negro */
+  --muted: #6c685c; /* texto secundario */
+  --accent: #2e2bff; /* acento eléctrico */
+  --accent-hover: #201ee0;
+  --accent-2: #ff5a3c; /* secundario cálido (tatuaje/ink) */
+  --line: rgba(21, 20, 15, 0.14);
+  --line-strong: rgba(21, 20, 15, 0.28);
+
+  /* Alias para no romper nombres previos usados en el markup/CSS */
+  --color-primary: var(--accent);
+  --color-primary-hover: var(--accent-hover);
+  --color-on-primary: var(--paper);
+  --color-accent: var(--accent);
+  --color-background: var(--paper);
+  --color-surface: var(--paper-raised);
+  --color-surface-raised: var(--paper-raised);
+  --color-foreground: var(--ink);
+  --color-muted-foreground: var(--muted);
+  --color-border: var(--line);
+  --color-border-strong: var(--line-strong);
+  --color-destructive: #c23a1e;
+  --color-destructive-bg: rgba(255, 90, 60, 0.12);
+  --color-success: #1f7a4d;
+  --color-success-bg: rgba(31, 122, 77, 0.1);
+  --color-ring: var(--accent);
+
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Space Grotesk", var(--font-sans);
+  --font-heading: var(--font-display);
+  --font-body: var(--font-sans);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-io: cubic-bezier(0.76, 0, 0.24, 1);
+  --pad: clamp(1.25rem, 5vw, 5rem);
+  --maxw: 1320px;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -29,14 +52,14 @@
   --space-8: 32px;
   --space-12: 48px;
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
   --radius-lg: 20px;
 
-  color-scheme: dark;
+  color-scheme: light;
   font: 16px/1.5 var(--font-body);
-  color: var(--color-foreground);
-  background: var(--color-background);
+  color: var(--ink);
+  background: var(--paper);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -47,14 +70,21 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
-  min-height: 100svh;
-  background: radial-gradient(circle at top, #1a1d47 0%, var(--color-background) 55%);
+  min-height: 100dvh;
+  background: var(--paper);
+  color: var(--ink);
+  letter-spacing: -0.01em;
+  overflow-x: hidden;
 }
 
 #root {
-  min-height: 100svh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -62,22 +92,30 @@ body {
 h1,
 h2,
 h3 {
-  font-family: var(--font-heading);
-  font-weight: 700;
-  color: var(--color-foreground);
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--ink);
   margin: 0;
+  text-wrap: balance;
 }
 
 p {
   margin: 0;
+  text-wrap: pretty;
 }
 
 a {
-  color: var(--color-primary);
+  color: var(--accent);
+  text-decoration: none;
 }
 
 button {
   font-family: inherit;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--paper);
 }
 
 :focus-visible {
@@ -85,7 +123,30 @@ button {
   outline-offset: 2px;
 }
 
+/* ---------- Reveal on scroll ---------- */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.8s var(--ease-out),
+    transform 0.8s var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+[data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
   *,
   *::before,
   *::after {

@@ -17,22 +17,27 @@ function App() {
 
   return (
     <div>
-      <nav className="vista-switch">
-        <button
-          type="button"
-          className={vista === "cliente" ? "activo" : ""}
-          onClick={() => setVista("cliente")}
-        >
-          Cotizador (cliente)
-        </button>
-        <button
-          type="button"
-          className={vista === "tatuador" ? "activo" : ""}
-          onClick={() => setVista("tatuador")}
-        >
-          Configuración (tatuador)
-        </button>
-      </nav>
+      <header className="topbar">
+        <a className="topbar__brand" href="#top">
+          capi<span>cotizador</span>
+        </a>
+        <nav className="vista-switch" aria-label="Cambiar vista">
+          <button
+            type="button"
+            className={vista === "cliente" ? "activo" : ""}
+            onClick={() => setVista("cliente")}
+          >
+            Cliente
+          </button>
+          <button
+            type="button"
+            className={vista === "tatuador" ? "activo" : ""}
+            onClick={() => setVista("tatuador")}
+          >
+            Tatuador
+          </button>
+        </nav>
+      </header>
 
       {/* Se mantienen ambas montadas (nunca desmontadas) para no perder la
           sesión de Configuración (token/config en memoria) ni el progreso

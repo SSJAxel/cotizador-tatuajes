@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import * as THREE from "three";
 import { MTLLoader } from "three/examples/jsm/loaders/MTLLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { LoopSubdivision } from "three-subdivide";
 
 const ALTURA_DESEADA = 1.75;
 
@@ -56,8 +57,16 @@ export function useHumanoidModel() {
 
         skinMesh.castShadow = true;
         skinMesh.receiveShadow = true;
-        // Normales por vértice promediadas: suaviza el sombreado facetado de la
-        // malla low-poly (se ve escultural en vez de poligonal).
+        // Subdivisión de Loop: cuadruplica los triángulos y suaviza la silueta
+        // low-poly del base mesh de MakeHuman — bastante menos facetado. Se
+        // preservan las UVs (uvSmooth:false) para que el decal no se distorsione.
+        const geomSuave = LoopSubdivision.modify(skinMesh.geometry, 1, {
+          uvSmooth: false,
+          preserveEdges: false,
+          flatOnly: false,
+        });
+        skinMesh.geometry.dispose();
+        skinMesh.geometry = geomSuave;
         skinMesh.geometry.computeVertexNormals();
 
         // Material "maniquí de yeso": mate, cálido-neutro, escultural. Reemplaza

@@ -92,15 +92,173 @@
 }
 
 .preview3d__canvas {
+  position: relative;
   flex: 1;
   aspect-ratio: 4 / 3;
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--color-border);
   touch-action: none;
+  /* Backdrop de estudio: cove suave, claro arriba → sombra cálida abajo */
+  background:
+    radial-gradient(120% 90% at 50% 18%, #f6f2ea 0%, #ece6da 46%, #ddd4c4 100%);
+}
+
+/* Vignette sutil para dar volumen al "set" */
+.preview3d__canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 80% at 50% 40%, transparent 55%, rgba(40, 36, 28, 0.12) 100%);
 }
 
 .preview3d__canvas canvas {
+  position: relative;
+  z-index: 1;
   display: block;
   cursor: grab;
+}
+
+.preview3d__spinner {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+}
+
+.preview3d__spinner span {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  border-top-color: var(--accent);
+  animation: preview3d-spin 0.8s linear infinite;
+}
+
+@keyframes preview3d-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preview3d__spinner span {
+    animation: none;
+  }
+}
+
+.preview3d__toggle {
+  padding: 0.5rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-foreground);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.18s var(--ease-out), color 0.18s var(--ease-out);
+}
+.preview3d__toggle.activo {
+  background: var(--accent);
+  color: var(--paper);
+  border-color: var(--accent);
+}
+
+/* ---------- Toggle izquierda / derecha ---------- */
+.preview3d__lado {
+  display: flex;
+  gap: 0.4rem;
+}
+.preview3d__lado button {
+  flex: 1;
+  padding: 0.45rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+}
+.preview3d__lado button.activo {
+  background: var(--accent);
+  color: var(--paper);
+  border-color: var(--accent);
+}
+
+/* ---------- Modal de recorte a forma libre ---------- */
+.recorte-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(21, 20, 15, 0.55);
+  backdrop-filter: blur(3px);
+}
+.recorte-modal {
+  background: var(--color-background);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  max-width: min(92vw, 520px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.recorte-modal h3 {
+  margin: 0;
+  font-family: var(--font-heading, inherit);
+}
+.recorte-canvas {
+  align-self: center;
+  max-width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background:
+    repeating-conic-gradient(#e7e1d4 0% 25%, #f2eee4 0% 50%) 50% / 20px 20px;
+  cursor: crosshair;
+  touch-action: none;
+}
+.recorte-acciones {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* ---------- Selector de modo (girar / cámara / ubicar) ---------- */
+.preview3d__modos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.3rem;
+  padding: 0.3rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.preview3d__modos button {
+  padding: 0.5rem 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+}
+.preview3d__modos button:hover:not(:disabled):not(.activo) {
+  color: var(--color-foreground);
+}
+.preview3d__modos button.activo {
+  background: var(--color-foreground);
+  color: var(--color-background);
+}
+.preview3d__modos button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

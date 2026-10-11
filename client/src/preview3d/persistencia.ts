@@ -1,6 +1,8 @@
 import type { ZonaCuerpo } from "./types";
 
-const DIMENSION_MAXIMA = 900;
+// Lado máximo de la imagen base. Subido a 1600 para que un diseño chico y
+// simple se siga viendo nítido al acercar el zoom (antes 900 lo dejaba blando).
+const DIMENSION_MAXIMA = 1600;
 
 export type DisenioGuardado = {
   imagenDataUrl: string;
@@ -8,7 +10,38 @@ export type DisenioGuardado = {
   localPos: [number, number, number];
   rotacionDeg: number;
   escala: number;
+  /** 1 = sin cambios; <1 menos contraste, >1 más. Lo define la persona. */
+  contraste: number;
 };
+
+/**
+ * Aplica contraste a una imagen (data URL) preservando la transparencia
+ * (el filtro de contraste toca RGB, no el alfa). Devuelve un nuevo data URL.
+ */
+export function aplicarContraste(dataUrl: string, contraste: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (contraste === 1) {
+      resolve(dataUrl);
+      return;
+    }
+    const img = new Image();
+    img.onerror = () => reject(new Error("No se pudo procesar el contraste."));
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("No se pudo procesar el contraste."));
+        return;
+      }
+      ctx.filter = `contrast(${Math.round(contraste * 100)}%)`;
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.src = dataUrl;
+  });
+}
 
 /** Downscale a un lado máximo de 900px y lo devuelve como data URL PNG (preserva transparencia). */
 export function comprimirImagenADataUrl(file: File): Promise<string> {

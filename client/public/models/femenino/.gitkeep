@@ -1,0 +1,4 @@
+# Poses del modelo femenino. Mismo formato que masculino/: cada pose es un
+# par <slug>.obj + <slug>.mtl (más textures/ si hace falta), exportado de
+# MakeHuman. Agregalas acá y sumalas al catálogo en
+# client/src/preview3d/poses.ts — aparecen solas en el selector.

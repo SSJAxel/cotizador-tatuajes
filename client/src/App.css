@@ -991,8 +991,11 @@
   border: 1px solid var(--color-border);
 }
 .quiz-ref__img--placeholder {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
   text-align: center;
   padding: 0.5rem;
   font-size: 0.8rem;
@@ -1005,6 +1008,10 @@
     var(--color-surface-raised) 20px
   );
   border: 1px dashed var(--color-border-strong);
+}
+.quiz-ref__img--placeholder small {
+  font-size: 0.65rem;
+  opacity: 0.75;
 }
 .quiz-nivel {
   display: block;
@@ -1189,10 +1196,16 @@
 }
 
 .panel-guardar {
-  position: sticky;
-  bottom: 0;
-  padding: 1rem 0;
-  background: linear-gradient(to top, var(--color-background) 60%, transparent);
+  /* No sticky: en formularios largos (con "Avanzado" abierto, 46 filas) una
+     barra sticky queda pegada al fondo de la pantalla y tapa contenido
+     durante CASI TODO el scroll, no solo al final -- se vio tapando el
+     campo "Moneda" en mobile. Un botón normal al final del form, visible
+     recién cuando llegás ahí, es menos "siempre a mano" pero nunca tapa
+     nada. */
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--color-background);
+  border-top: 1px solid var(--color-border);
 }
 .panel-guardar button {
   width: 100%;

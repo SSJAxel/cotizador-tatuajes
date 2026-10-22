@@ -219,7 +219,7 @@ export function TenantConfigForm() {
         body: JSON.stringify({ password }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Error creando el tenant.");
+      if (!res.ok) throw new Error(data.error ?? "Error creando el estudio.");
 
       const { token: nuevoToken } = data as AuthResponse;
       setToken(nuevoToken);
@@ -387,7 +387,7 @@ export function TenantConfigForm() {
           {modo === "login" && (
             <form onSubmit={loguear}>
               <p className="disclaimer">
-                El tenant "{slug}" ya existe. Iniciá sesión para editarlo.
+                Ya existe un estudio con el slug "{slug}". Iniciá sesión para editarlo.
               </p>
               <label>
                 Contraseña
@@ -439,8 +439,8 @@ export function TenantConfigForm() {
           {modo === "registro" && (
             <form onSubmit={registrar}>
               <p className="disclaimer">
-                El tenant "{slug}" no existe todavía — elegí una contraseña para crearlo. Vas a poder
-                cargar precios y opciones después de crearlo.
+                Todavía no existe un estudio con el slug "{slug}" — elegí una contraseña para crearlo.
+                Vas a poder cargar precios y opciones después de crearlo.
               </p>
               <label>
                 Contraseña (mínimo {PASSWORD_MIN_LARGO} caracteres)
@@ -453,7 +453,7 @@ export function TenantConfigForm() {
                 />
               </label>
               <button type="submit" disabled={cargando}>
-                {cargando ? "Creando..." : "Crear tenant"}
+                {cargando ? "Creando..." : "Crear mi estudio"}
               </button>
               <div className="auth-card__links">
                 <button type="button" onClick={() => setModo("elegir_slug")}>

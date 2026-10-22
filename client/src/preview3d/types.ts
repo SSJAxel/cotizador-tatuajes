@@ -113,9 +113,14 @@ export function focoDeZona(
 
 /**
  * Heurística de zona a partir del punto de click en espacio local del cuerpo
- * (mismo sistema de coordenadas que el OBJ exportado, antes de escalar).
- * El export de MakeHuman viene en T-pose, así que los brazos quedan bien
- * separados del torso en X — sirve como corte simple sin necesitar huesos.
+ * (mismo sistema de coordenadas que la malla ya aplanada con sus morphs,
+ * antes de escalar — ver useHumanoidModel.ts). Asume que la pose activa
+ * mantiene los brazos razonablemente separados del torso en X (como la pose
+ * "Relajada" de hoy, heredera del T-pose de MakeHuman) — sirve como corte
+ * simple sin necesitar huesos. Sliders de forma muy extremos (ej. hombro muy
+ * desarrollado) o futuras poses con los brazos pegados al cuerpo pueden
+ * degradar este corte torso/brazo/pierna; aceptable porque las zonas ya son
+ * gruesas por decisión previa, pero queda anotado para quien lo retome.
  */
 export function clasificarZona(
   local: THREE.Vector3,

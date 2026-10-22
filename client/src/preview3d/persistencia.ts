@@ -1,10 +1,22 @@
+import type { Genero } from "./poses";
 import type { ZonaCuerpo } from "./types";
 
 // Lado máximo de la imagen base. Subido a 1600 para que un diseño chico y
 // simple se siga viendo nítido al acercar el zoom (antes 900 lo dejaba blando).
 const DIMENSION_MAXIMA = 1600;
 
+/**
+ * Se incrementa cada vez que cambia la forma de `DisenioGuardado` de un modo
+ * incompatible con versiones viejas. Hoy existe porque `localPos`/`morphs`
+ * están atados a la malla GLB actual — un diseño guardado con otra versión
+ * se descarta entero (ver cargarDiseno), igual que ya se invalida el decal
+ * al cambiar de género/pose.
+ */
+export const ESQUEMA_VERSION = 2;
+
 export type DisenioGuardado = {
+  version: number;
+  genero: Genero;
   imagenDataUrl: string;
   zona: ZonaCuerpo;
   localPos: [number, number, number];
@@ -12,6 +24,8 @@ export type DisenioGuardado = {
   escala: number;
   /** 1 = sin cambios; <1 menos contraste, >1 más. Lo define la persona. */
   contraste: number;
+  /** Influencia (0..1) de cada morph target activo al momento de guardar. */
+  morphs: Record<string, number>;
 };
 
 /**
@@ -89,7 +103,17 @@ export function cargarDiseno(tenantSlug: string): DisenioGuardado | null {
   try {
     const crudo = localStorage.getItem(clave(tenantSlug));
     if (!crudo) return null;
-    return JSON.parse(crudo) as DisenioGuardado;
+    const datos = JSON.parse(crudo) as Partial<DisenioGuardado>;
+    if (datos.version !== ESQUEMA_VERSION) {
+      // Esquema viejo (incluye todo lo guardado antes de agregar `version`,
+      // que da `undefined` acá) o corrupto: localPos/morphs quedaron atados
+      // a una malla que ya no existe. Sin migración campo-por-campo posible
+      // — se descarta entero, mismo criterio que ya usamos para invalidar el
+      // decal al cambiar de género/pose.
+      localStorage.removeItem(clave(tenantSlug));
+      return null;
+    }
+    return datos as DisenioGuardado;
   } catch (err) {
     console.warn("No se pudo leer el diseño guardado:", err);
     return null;

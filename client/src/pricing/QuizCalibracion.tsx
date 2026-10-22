@@ -34,8 +34,9 @@ function FotoReferencia({ estilo }: { estilo: string }) {
 
   if (fallo) {
     return (
-      <div className="quiz-ref__img quiz-ref__img--placeholder" aria-hidden="true">
-        {etiqueta(estilo)}
+      <div className="quiz-ref__img quiz-ref__img--placeholder">
+        <span aria-hidden="true">{etiqueta(estilo)}</span>
+        <small>Sin foto de referencia todavía</small>
       </div>
     );
   }
@@ -290,7 +291,7 @@ export function QuizCalibracion({ slug, token }: Props) {
             <FotoReferencia estilo={edicion.estilo} />
             <p className="disclaimer">
               Imaginá un diseño típico de <strong>{etiqueta(edicion.estilo)}</strong> de
-              ~{REFERENCIA_CM} cm. (La imagen de referencia real va acá más adelante.)
+              ~{REFERENCIA_CM} cm.
             </p>
           </div>
 

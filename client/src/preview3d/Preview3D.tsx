@@ -20,6 +20,7 @@ import {
 } from "./types";
 import type { Foco, ZonaCuerpo } from "./types";
 import { RecorteImagen } from "./RecorteImagen";
+import { GENEROS, SLIDERS, type Genero, type SliderMorph } from "./poses";
 import { ETIQUETAS } from "../pricing/fixtures";
 import {
   aplicarContraste,
@@ -27,6 +28,8 @@ import {
   cargarDiseno,
   comprimirImagenADataUrl,
   guardarDiseno,
+  ESQUEMA_VERSION,
+  type DisenioGuardado,
 } from "./persistencia";
 import "./preview3d.css";
 
@@ -109,6 +112,13 @@ function Scena({
   const ultimoY = useRef(0);
 
   const alturaMedia = ((modelo.bbox.max.y - modelo.bbox.min.y) * modelo.escala) * 0.5;
+  // Leído dentro del efecto de cámara sin ser su dependencia — alturaMedia
+  // cambia en CADA ajuste de slider (el bbox se recalcula con cada morph),
+  // y si el efecto de abajo dependiera de su valor, la cámara se reiniciaba
+  // a la vista general en cada movimiento, incluso con zoom manual ya
+  // hecho — eso es lo que se sentía como que "la cámara vuela".
+  const alturaMediaRef = useRef(alturaMedia);
+  alturaMediaRef.current = alturaMedia;
 
   // Objetivo vs. valor actual (se interpolan suave cada frame).
   const rotObj = useRef(0);
@@ -130,12 +140,12 @@ function Scena({
       radObj.current = foco.radio;
       distObj.current = 0.8;
     } else {
-      altObj.current = alturaMedia;
+      altObj.current = alturaMediaRef.current;
       radObj.current = 0;
       distObj.current = 2.4;
       // rotObj se mantiene (no forzamos la orientación en "vista general").
     }
-  }, [foco, alturaMedia]);
+  }, [foco]);
 
   const raycastarEn = useCallback(
     (clientX: number, clientY: number) => {
@@ -225,7 +235,7 @@ function Scena({
   }, [gl, raycastarEn, colocarDesdeHit, textura, modo]);
 
   useFrame((_, dt) => {
-    if (autoGirar && !arrastrandoModeloRef.current) {
+    if (autoGirar && !arrastrandoMoverRef.current) {
       rotObj.current += dt * 0.6;
     }
     const k = 1 - Math.pow(0.0015, Math.min(dt, 0.05));
@@ -295,7 +305,20 @@ type Preview3DProps = {
 };
 
 export function Preview3D({ tenantSlug = "default" }: Preview3DProps) {
-  const modelo = useHumanoidModel();
+  const [genero, setGenero] = useState<Genero>("masculino");
+  const modelo = useHumanoidModel(genero);
+  const slidersDelGenero = SLIDERS[genero];
+  const slidersForma = slidersDelGenero.filter((s) => s.grupo === "forma");
+  const slidersPose = slidersDelGenero.filter((s) => s.grupo === "pose");
+  // Valor MOSTRADO de cada slider de forma (0..100, o -100..100 si es
+  // bidireccional) — vive acá porque el slider necesita un valor controlado
+  // aunque la influencia real (0..1 por morph) se guarda dentro del hook.
+  const [valoresForma, setValoresForma] = useState<Record<string, number>>({});
+  // null = "Relajada" (todos los morphs de pose en 0, no hay ninguno activo).
+  const [poseActiva, setPoseActiva] = useState<string | null>(null);
+  // Diseño leído de localStorage al montar, pendiente de aplicar sus morphs
+  // en cuanto el modelo (async) esté listo — ver el efecto más abajo.
+  const [guardadoPendiente, setGuardadoPendiente] = useState<DisenioGuardado | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [activaZona, setActivaZona] = useState<ZonaCuerpo | null>(null);
   const [decalPos, setDecalPos] = useState<[number, number, number]>([0, 0, 0]);
@@ -341,7 +364,9 @@ export function Preview3D({ tenantSlug = "default" }: Preview3DProps) {
 
   const textura = useTexturaSubida(texturaUrl);
 
-  // Restaurar diseño guardado en este navegador, una sola vez al montar.
+  // Restaurar diseño guardado en este navegador, una sola vez al montar. Los
+  // morphs recién se aplican cuando el modelo (carga async) esté listo y
+  // coincida con el género guardado — ver el efecto siguiente.
   useEffect(() => {
     const guardado = cargarDiseno(tenantSlug);
     if (guardado) {
@@ -351,9 +376,46 @@ export function Preview3D({ tenantSlug = "default" }: Preview3DProps) {
       setDecalRollDeg(guardado.rotacionDeg);
       setDecalScale(guardado.escala);
       setContraste(guardado.contraste ?? 1);
+      if (guardado.genero === genero) {
+        setGuardadoPendiente(guardado);
+      }
     }
     setCargadoDeGuardado(true);
+    // Solo al montar: `genero` se lee en su valor inicial a propósito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantSlug]);
+
+  // Aplica los morphs guardados en cuanto el modelo del género guardado
+  // termina de cargar (no se puede hacer antes: el hook todavía no tiene
+  // geometría para recombinar).
+  useEffect(() => {
+    if (!guardadoPendiente || !modelo) return;
+    const valoresUI: Record<string, number> = {};
+    for (const slider of slidersForma) {
+      if (slider.tipo === "unico") {
+        const influencia = guardadoPendiente.morphs[slider.nombre] ?? 0;
+        modelo.setMorph(slider.nombre, influencia);
+        valoresUI[slider.nombre] = Math.round(influencia * 100);
+      } else {
+        const pos = guardadoPendiente.morphs[slider.nombrePositivo] ?? 0;
+        const neg = guardadoPendiente.morphs[slider.nombreNegativo] ?? 0;
+        modelo.setMorph(slider.nombrePositivo, pos);
+        modelo.setMorph(slider.nombreNegativo, neg);
+        valoresUI[slider.nombrePositivo] = Math.round((pos - neg) * 100);
+      }
+    }
+    setValoresForma(valoresUI);
+    const poseGuardada = slidersPose.find(
+      (s) => s.tipo === "unico" && (guardadoPendiente.morphs[s.nombre] ?? 0) > 0,
+    );
+    if (poseGuardada && poseGuardada.tipo === "unico") {
+      modelo.setMorph(poseGuardada.nombre, 1);
+      setPoseActiva(poseGuardada.nombre);
+    }
+    setGuardadoPendiente(null);
+    // slidersForma/slidersPose dependen solo de `genero`, ya cubierto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guardadoPendiente, modelo]);
 
   // Guardar cambios posteriores (no en la primera carga, para no
   // reescribir con los mismos datos que acabamos de leer).
@@ -361,23 +423,79 @@ export function Preview3D({ tenantSlug = "default" }: Preview3DProps) {
     if (!cargadoDeGuardado) return;
     if (!imageUrl || !activaZona) return;
     guardarDiseno(tenantSlug, {
+      version: ESQUEMA_VERSION,
+      genero,
       imagenDataUrl: imageUrl,
       zona: activaZona,
       localPos: decalPos,
       rotacionDeg: decalRollDeg,
       escala: decalScale,
       contraste,
+      morphs: modelo?.influencias ?? {},
     });
   }, [
     cargadoDeGuardado,
     tenantSlug,
+    genero,
     imageUrl,
     activaZona,
     decalPos,
     decalRollDeg,
     decalScale,
     contraste,
+    modelo,
   ]);
+
+  // Las coordenadas del tatuaje son relativas a la geometría actual — al
+  // cambiar de género, o CUALQUIER morph de forma/pose, ya no corresponden a
+  // la nueva, así que se limpia la ubicación (el diseño y el contraste se
+  // conservan, solo hay que reubicarlo). Se saltea el primer render para no
+  // pisar lo restaurado.
+  const primerRenderPoseRef = useRef(true);
+  useEffect(() => {
+    if (primerRenderPoseRef.current) {
+      primerRenderPoseRef.current = false;
+      return;
+    }
+    setActivaZona(null);
+    setDecalPos([0, 0, 0]);
+    setParteEnfocada(null);
+  }, [genero, modelo?.geometriaVersion]);
+
+  function cambiarGenero(nuevo: Genero) {
+    if (nuevo === genero) return;
+    setGenero(nuevo);
+    setValoresForma({});
+    setPoseActiva(null);
+  }
+
+  function claveSlider(slider: SliderMorph): string {
+    return slider.tipo === "unico" ? slider.nombre : slider.nombrePositivo;
+  }
+
+  function handleSliderForma(slider: SliderMorph, valorUI: number) {
+    setValoresForma((prev) => ({ ...prev, [claveSlider(slider)]: valorUI }));
+    if (!modelo) return;
+    if (slider.tipo === "unico") {
+      modelo.setMorph(slider.nombre, valorUI / 100);
+    } else if (valorUI >= 0) {
+      modelo.setMorph(slider.nombrePositivo, valorUI / 100);
+      modelo.setMorph(slider.nombreNegativo, 0);
+    } else {
+      modelo.setMorph(slider.nombrePositivo, 0);
+      modelo.setMorph(slider.nombreNegativo, -valorUI / 100);
+    }
+  }
+
+  function handlePose(nombrePose: string | null) {
+    if (!modelo) return;
+    for (const slider of slidersPose) {
+      if (slider.tipo === "unico") {
+        modelo.setMorph(slider.nombre, slider.nombre === nombrePose ? 1 : 0);
+      }
+    }
+    setPoseActiva(nombrePose);
+  }
 
   const handlePlace = useCallback((zona: ZonaCuerpo, localPos: THREE.Vector3) => {
     setActivaZona(zona);
@@ -404,6 +522,68 @@ export function Preview3D({ tenantSlug = "default" }: Preview3DProps) {
     <div className="preview3d">
       <aside className="preview3d__panel">
         <h2>Vista previa en 3D</h2>
+
+        <div className="preview3d__lado" role="group" aria-label="Género del modelo">
+          {GENEROS.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              className={genero === g.id ? "activo" : ""}
+              disabled={!g.disponible}
+              title={g.disponible ? undefined : "Próximamente"}
+              onClick={() => cambiarGenero(g.id)}
+            >
+              {g.label}
+              {!g.disponible && " (pronto)"}
+            </button>
+          ))}
+        </div>
+
+        <fieldset className="preview3d__campo">
+          <legend>Forma del cuerpo</legend>
+          {slidersForma.map((slider) => {
+            const clave = claveSlider(slider);
+            const valor = valoresForma[clave] ?? 0;
+            const rango = slider.tipo === "par" ? { min: -100, max: 100 } : { min: 0, max: 100 };
+            return (
+              <label className="preview3d__campo" key={clave}>
+                {slider.label}
+                <input
+                  type="range"
+                  min={rango.min}
+                  max={rango.max}
+                  value={valor}
+                  disabled={!modelo}
+                  onChange={(e) => handleSliderForma(slider, Number(e.target.value))}
+                />
+              </label>
+            );
+          })}
+        </fieldset>
+
+        <label className="preview3d__campo">
+          Pose
+          {slidersPose.length > 0 ? (
+            <select
+              value={poseActiva ?? ""}
+              onChange={(e) => handlePose(e.target.value || null)}
+            >
+              <option value="">Relajada</option>
+              {slidersPose.map((p) =>
+                p.tipo === "unico" ? (
+                  <option key={p.nombre} value={p.nombre}>
+                    {p.label}
+                  </option>
+                ) : null,
+              )}
+            </select>
+          ) : (
+            <select disabled>
+              <option>Todavía no hay poses para este género</option>
+            </select>
+          )}
+        </label>
+
         <p className="preview3d__ayuda">
           Elegí qué hace el arrastre, y usá la rueda para acercar. Es una vista
           aproximada — el resultado final depende del tatuador.
